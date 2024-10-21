@@ -25,17 +25,35 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.OIDC_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Step 3: Deploy CloudFormation stack (unified template)
+      # Step 3: Create or Get ECR Repository
+      - name: Create or Get ECR Repository
+        id: ecr
+        run: |
+          REPO_NAME="my-fastapi-app"
+          
+          # Check if the repository already exists
+          ECR_REPO_URI=$(aws ecr describe-repositories --repository-names $REPO_NAME --query 'repositories[0].repositoryUri' --output text 2>/dev/null || echo "NOT_FOUND")
+
+          # If the repository doesn't exist, create it
+          if [ "$ECR_REPO_URI" == "NOT_FOUND" ]; then
+            aws ecr create-repository --repository-name $REPO_NAME
+            ECR_REPO_URI=$(aws ecr describe-repositories --repository-names $REPO_NAME --query 'repositories[0].repositoryUri' --output text)
+          fi
+
+          # Export the repository URI for later steps
+          echo "ECR_REPO_URI=$ECR_REPO_URI" >> $GITHUB_ENV
+
+      # Step 4: Deploy CloudFormation stack (unified template)
       - name: Deploy CloudFormation Stack
         run: |
           aws cloudformation deploy \
             --template-file cloudformation/deploy.yml \
             --stack-name fastapi-app-stack \
             --parameter-overrides \
-              ImageUrl=${{ secrets.ECR_REPOSITORY }}:latest \
+              ImageUrl=$ECR_REPO_URI:latest \
             --capabilities CAPABILITY_NAMED_IAM
 
-      # Step 4: Get CloudFormation outputs (S3, IAM Role, ALB DNS)
+      # Step 5: Get CloudFormation outputs (S3, IAM Role, ALB DNS)
       - name: Get CloudFormation Outputs
         run: |
           S3_BUCKET_NAME=$(aws cloudformation describe-stacks \
@@ -57,24 +75,24 @@ jobs:
           echo "IAM_ROLE_ARN=$IAM_ROLE_ARN" >> $GITHUB_ENV
           echo "ALB_DNS_NAME=$ALB_DNS_NAME" >> $GITHUB_ENV
 
-      # Step 5: Log in to Amazon ECR
+      # Step 6: Log in to Amazon ECR
       - name: Log in to Amazon ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY }}
+          docker login --username AWS --password-stdin $ECR_REPO_URI
 
-      # Step 6: Build Docker image
+      # Step 7: Build Docker image
       - name: Build Docker image
         run: |
           docker build -t my-fastapi-app .
-          docker tag my-fastapi-app:latest ${{ secrets.ECR_REPOSITORY }}:latest
+          docker tag my-fastapi-app:latest $ECR_REPO_URI:latest
 
-      # Step 7: Push Docker image to Amazon ECR
+      # Step 8: Push Docker image to Amazon ECR
       - name: Push Docker image to Amazon ECR
         run: |
-          docker push ${{ secrets.ECR_REPOSITORY }}:latest
+          docker push $ECR_REPO_URI:latest
 
-      # Step 8: Update ECS Service with new Docker image
+      # Step 9: Update ECS Service with new Docker image
       - name: Update ECS Service with new Docker image
         run: |
           aws ecs update-service \
