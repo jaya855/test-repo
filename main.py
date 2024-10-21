@@ -1,4 +1,5 @@
 import re
+import os  # For fetching environment variables
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,10 +17,15 @@ from botocore.exceptions import NoCredentialsError, ClientError
 # Initialize FastAPI app
 app = FastAPI()
 
+# Fetch environment variables for AWS resources
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+IAM_ROLE_ARN = os.getenv('IAM_ROLE_ARN')
+ALB_DNS_NAME = os.getenv('ALB_DNS_NAME')
+
 # Set up CORS middleware to allow requests from specific origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://fastap-appli-2ytn8coorwil-179645885.ap-northeast-3.elb.amazonaws.com/","http://localhost:8000/"],  # Allow these origins
+    allow_origins=[f"http://{ALB_DNS_NAME}/", "http://localhost:8000/"],  # Use ALB DNS dynamically
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods
     allow_headers=["*"],  # Allow all headers
@@ -33,8 +39,7 @@ AZURE_REGION = "eastus"
 AZURE_ENDPOINT = f"https://{AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
 AZURE_VOICES_LIST_ENDPOINT = f"https://{AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/voices/list"
 
-# S3 bucket configuration
-S3_BUCKET_NAME = "text-to-speech-files-123"  # Replace with your S3 bucket name
+# S3 bucket configuration (dynamically fetched from environment variables)
 S3_INPUT_FOLDER = "input/"
 S3_SSML_FOLDER = "ssml/"
 S3_AUDIO_FOLDER = "audio/"
@@ -63,7 +68,7 @@ def convert_timestamp_to_seconds(timestamp):
         return 0  # Default to 0 if timestamp is not in correct format
 
 # Function to assume the role and get temporary credentials
-def assume_role(role_arn, session_name="MySession"):
+def assume_role(role_arn=IAM_ROLE_ARN, session_name="MySession"):  # Use IAM role dynamically
     try:
         sts_client = boto3.client('sts')
 
@@ -87,11 +92,11 @@ def assume_role(role_arn, session_name="MySession"):
         logging.error(f"Failed to assume role: {e}")
         raise e
 
-# Upload file to S3
+# Upload file to S3 (use dynamic S3 bucket name)
 def upload_file_to_s3(file_data, filename, folder):
     try:
         s3_client = boto3.client('s3')
-        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=f"{folder}{filename}", Body=file_data)
+        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=f"{folder}{filename}", Body=file_data)  # Use dynamic S3_BUCKET_NAME
         logging.info(f"Uploaded {filename} to S3 in folder {folder}")
         return f"s3://{S3_BUCKET_NAME}/{folder}{filename}"
     except NoCredentialsError as e:
@@ -105,8 +110,7 @@ def upload_file_to_s3(file_data, filename, folder):
 def get_azure_secrets(secret_name="azure-secrets", region_name="ap-south-1"):
     try:
         # Assume the role and get temporary credentials
-        role_arn = "arn:aws:iam::121263836368:role/tts-role"  # Replace with your IAM role ARN
-        session = assume_role(role_arn)
+        session = assume_role()
 
         # Create a Secrets Manager client with the assumed role session
         client = session.client(service_name="secretsmanager", region_name=region_name)
