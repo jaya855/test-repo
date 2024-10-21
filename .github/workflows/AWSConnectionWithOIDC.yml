@@ -1,53 +1,83 @@
-name: Deploy FastAPI App
+name: FastAPI Deployment Pipeline
 
 on:
   push:
     branches:
       - main
 
-env:
-  AWS_REGION: "ap-south-1"
-  AZURE_REGION: "eastus"
-
-permissions:
-  id-token: write # Needed for OIDC-based role assumption
-  contents: read  # Required for actions/checkout
-
 jobs:
-  build-and-deploy:
+  deploy-app:
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
-      # Step 1: Checkout the code from the GitHub repository
+      # Step 1: Checkout the code
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
-      # Step 2: Set up Python environment
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      # Step 2: Configure AWS credentials with OIDC and Assume Role
+      - name: Configure AWS Credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v2
         with:
-          python-version: '3.9'
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.OIDC_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # Step 3: Install dependencies
-      - name: Install dependencies
+      # Step 3: Deploy CloudFormation stack (unified template)
+      - name: Deploy CloudFormation Stack
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          aws cloudformation deploy \
+            --template-file cloudformation/deploy.yml \
+            --stack-name fastapi-app-stack \
+            --parameter-overrides \
+              ImageUrl=${{ secrets.ECR_REPOSITORY }}:latest \
+            --capabilities CAPABILITY_NAMED_IAM
 
-      # Step 4: Configure AWS credentials using OIDC
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::121263836368:role/tts-role  # Replace with your IAM Role ARN
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: fastapi-session
-
-      # Step 5: Upload static files and deploy app to S3 or any other service (if applicable)
-      - name: Upload static files to S3
+      # Step 4: Get CloudFormation outputs (S3, IAM Role, ALB DNS)
+      - name: Get CloudFormation Outputs
         run: |
-          aws s3 sync ./static s3://text-to-speech-files-123/static/
+          S3_BUCKET_NAME=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" \
+            --output text)
 
-      # Step 6: Run the FastAPI app (you might replace this with deployment commands)
-      - name: Start FastAPI app
+          IAM_ROLE_ARN=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='IAMRoleArn'].OutputValue" \
+            --output text)
+
+          ALB_DNS_NAME=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='ALBDNSName'].OutputValue" \
+            --output text)
+
+          echo "S3_BUCKET_NAME=$S3_BUCKET_NAME" >> $GITHUB_ENV
+          echo "IAM_ROLE_ARN=$IAM_ROLE_ARN" >> $GITHUB_ENV
+          echo "ALB_DNS_NAME=$ALB_DNS_NAME" >> $GITHUB_ENV
+
+      # Step 5: Log in to Amazon ECR
+      - name: Log in to Amazon ECR
         run: |
-          uvicorn app:app --host 0.0.0.0 --port 8000
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY }}
+
+      # Step 6: Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t my-fastapi-app .
+          docker tag my-fastapi-app:latest ${{ secrets.ECR_REPOSITORY }}:latest
+
+      # Step 7: Push Docker image to Amazon ECR
+      - name: Push Docker image to Amazon ECR
+        run: |
+          docker push ${{ secrets.ECR_REPOSITORY }}:latest
+
+      # Step 8: Update ECS Service with new Docker image
+      - name: Update ECS Service with new Docker image
+        run: |
+          aws ecs update-service \
+            --cluster fastapi-app-cluster \
+            --service fastapi-app-service \
+            --force-new-deployment
