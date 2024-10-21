@@ -9,6 +9,7 @@
       rel="stylesheet"
     />
     <style>
+      /* Same styles as before */
       body {
         display: flex;
         justify-content: center;
@@ -18,7 +19,6 @@
         background-color: #e2bfd9;
         font-family: "Poppins", sans-serif;
       }
-
       .container {
         background-color: #001f3f;
         padding: 20px;
@@ -27,13 +27,11 @@
         width: 400px;
         text-align: center;
       }
-
       .title {
         color: #fff;
         font-size: 2rem;
         margin-bottom: 20px;
       }
-
       .upload-area {
         border: 2px dashed #fff;
         color: #fff;
@@ -43,17 +41,14 @@
         border-radius: 8px;
         margin-bottom: 20px;
       }
-
       .upload-area:hover {
         background-color: #e7f3ff;
         color: #001f3f;
       }
-
       .file-name {
         margin: 10px 0;
         color: #fff;
       }
-
       .language-input {
         padding: 10px;
         border-radius: 5px;
@@ -64,7 +59,6 @@
         color: #000;
         box-sizing: border-box;
       }
-
       .btn {
         background-color: #007bff;
         color: #fff;
@@ -75,25 +69,20 @@
         width: 100%;
         font-size: 1rem;
       }
-
       .btn:hover {
         background-color: #0056b3;
       }
-
       .audio-container {
         display: none;
         margin-top: 20px;
       }
-
       .audio-container audio {
         width: 100%;
       }
-
       .error {
         color: red;
         margin-top: 20px;
       }
-
       .hidden {
         display: none;
       }
@@ -151,6 +140,25 @@
       const languageDownloadBtn = document.getElementById("languageDownloadBtn");
       const errorDiv = document.getElementById("error");
 
+      // ALB DNS Name - dynamically fetched or defined via environment
+      let ALB_DNS_NAME = "";  // Initialize the ALB DNS as empty
+
+      // Fetch the ALB DNS name from the server or configuration
+      const fetchALBDNSName = async () => {
+        try {
+          // Replace with the correct API to fetch the ALB DNS
+          const response = await fetch("/api/alb-dns"); // Assuming you have an API to provide the DNS
+          const data = await response.json();
+          ALB_DNS_NAME = data.dnsName || "";
+        } catch (error) {
+          console.error("Failed to fetch ALB DNS:", error);
+          ALB_DNS_NAME = "http://localhost:8000"; // Fallback to localhost in case of error
+        }
+      };
+
+      // Immediately fetch ALB DNS when the script loads
+      fetchALBDNSName();
+
       // Click to open file selector
       uploadArea.addEventListener("click", () => fileInput.click());
 
@@ -201,8 +209,8 @@
         formData.append("source", language);
 
         try {
-          // Change this URL to your ALB DNS
-          const response = await fetch("https://6292c68113d142deb7bdecc4d070175d.vfs.cloud9.ap-south-1.amazonaws.com/upload-csv", {
+          // Use dynamically fetched ALB DNS
+          const response = await fetch(`${ALB_DNS_NAME}/upload-csv`, {
             method: "POST",
             body: formData,
           });
