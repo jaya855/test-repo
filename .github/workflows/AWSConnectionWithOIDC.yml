@@ -1,21 +1,23 @@
-#For the provider URL: Use https://token.actions.githubusercontent.com
-#For the "Audience": Use sts.amazonaws.com 
 name: AWS OIDC Connect Demo
+
 on:
   push
+
 env:
   AWS_REGION : "ap-south-1"   
+
 permissions:
-      id-token: write   # This is required for requesting the JWT
-      contents: read    # This is required for actions/checkout
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+
 jobs:
   DemoOIDC:
-    runs-on: demo
+    runs-on: ubuntu-latest  # Use GitHub-hosted runner 'ubuntu-latest'
     steps:
       - name: Git clone the repository
         uses: actions/checkout@v3
 
-      - name: configure aws credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           role-to-assume: arn:aws:iam::121263836368:role/tts-test-role-2
