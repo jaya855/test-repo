@@ -38,9 +38,9 @@ jobs:
       - name: Install pytest
         run: pip install pytest
 
-      # Step 5: Run tests
+      # Step 5: Run pytest with verbose mode
       - name: Run pytest
-        run: pytest
+        run: pytest -v
 
       # Step 6: Configure AWS credentials using OIDC
       - name: Configure AWS Credentials
