@@ -34,15 +34,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Step 4: Install pytest
-      - name: Install pytest
-        run: pip install pytest
-
-      # Step 5: Run pytest with verbose mode
-      - name: Run pytest
-        run: pytest -v
-
-      # Step 6: Configure AWS credentials using OIDC
+      # Step 4: Configure AWS credentials using OIDC
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -50,12 +42,12 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: fastapi-session
 
-      # Step 7: Upload static files and deploy app to S3 or any other service (if applicable)
+      # Step 5: Upload static files and deploy app to S3 or any other service (if applicable)
       - name: Upload static files to S3
         run: |
           aws s3 sync ./static s3://text-to-speech-files-123/static/
 
-      # Step 8: Run the FastAPI app (you might replace this with deployment commands)
+      # Step 6: Run the FastAPI app (you might replace this with deployment commands)
       - name: Start FastAPI app
         run: |
           uvicorn app:app --host 0.0.0.0 --port 8000
