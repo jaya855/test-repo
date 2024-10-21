@@ -1,29 +1,64 @@
-#For the provider URL: Use https://token.actions.githubusercontent.com
-#For the "Audience": Use sts.amazonaws.com 
-name: AWS OIDC Connect Demo
+name: Deploy FastAPI App
+
 on:
-  push
+  push:
+    branches:
+      - main
+
 env:
-  AWS_REGION : "ap-south-1"   
+  AWS_REGION: "ap-south-1"
+  AZURE_REGION: "eastus"
+
 permissions:
-      id-token: write   # This is required for requesting the JWT
-      contents: read    # This is required for actions/checkout
+  id-token: write # Needed for OIDC-based role assumption
+  contents: read  # Required for actions/checkout
+
 jobs:
-  DemoOIDC:
-    runs-on: demo
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
     steps:
-      - name: Git clone the repository
+      # Step 1: Checkout the code from the GitHub repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: configure aws credentials
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 4: Configure AWS credentials using OIDC
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::121263836368:role/tts-test-role-2
-          role-session-name: samplerolesession
+          role-to-assume: arn:aws:iam::121263836368:role/tts-role  # Replace with your IAM Role ARN
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: fastapi-session
 
-      - name: Print AWS SSM Parameter
-        run: aws ssm get-parameter --name=hello_aws-gh-oidc --query Parameter.Value
+      # Step 5: Test the app (optional, add if you have tests)
+      - name: Run tests
+        run: |
+          pytest
 
-      - name: Print assumed role
-        run: aws sts get-caller-identity
+      # Step 6: Upload static files and deploy app to S3 or any other service (if applicable)
+      - name: Upload static files to S3
+        run: |
+          aws s3 sync ./static s3://text-to-speech-files-123/static/
+
+      # Step 7: Run the FastAPI app (you might replace this with deployment commands)
+      - name: Start FastAPI app
+        run: |
+          uvicorn app:app --host 0.0.0.0 --port 8000
+
+      # Step 8: Assume AWS role and access secrets (e.g., Azure API Key)
+      - name: Access Azure API key from AWS Secrets Manager
+        run: |
+          aws secretsmanager get-secret-value --secret-id azure-secrets --region ${{ env.AWS_REGION }}
+
