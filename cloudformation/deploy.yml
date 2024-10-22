@@ -124,6 +124,18 @@ Resources:
     Properties:
       ClusterName: MyFargateCluster
 
+  # S3 Bucket for files
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "text-to-speech-${AWS::AccountId}-${AWS::Region}"
+      AccessControl: Private
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: TextToSpeechS3Bucket
+
   # ECS Task Definition
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
