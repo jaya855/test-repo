@@ -16,11 +16,6 @@ Resources:
         - Key: Name
           Value: MyVPC
 
-  # Fetch availability zones dynamically
-  AZList:
-    Type: "List"
-    Value: !GetAZs ''
-
   # Public Subnets
   PublicSubnet1:
     Type: AWS::EC2::Subnet
@@ -28,7 +23,7 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [ 0, !Ref AZList ]
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
       Tags:
         - Key: Name
           Value: PublicSubnet1
@@ -40,7 +35,7 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [ 1, !Ref AZList ]
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
       Tags:
         - Key: Name
           Value: PublicSubnet2
@@ -114,7 +109,7 @@ Conditions:
   HasMultipleAZs:
     Fn::Not:
       - Fn::Equals:
-          - Fn::Select [ 1, !Ref AZList ]
+          - Fn::Select [ 1, !GetAZs '' ]
           - ""
 
 Outputs:
