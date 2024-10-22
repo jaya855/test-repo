@@ -92,12 +92,6 @@ Resources:
     Properties:
       ClusterName: MyFargateCluster
 
-  # ECR Repository
-  ECRRepository:
-    Type: AWS::ECR::Repository
-    Properties:
-      RepositoryName: my-fastapi-app
-
   # S3 Bucket for files
   S3Bucket:
     Type: AWS::S3::Bucket
