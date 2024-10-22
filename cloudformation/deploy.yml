@@ -1,148 +1,108 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Parameters:
-  S3BucketName:
-    Type: String
-    Description: "S3 bucket name for storing input, SSML, and audio files"
-
   ImageUrl:
     Type: String
     Description: "Docker image URL for the FastAPI app"
 
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: "VPC where resources will be deployed"
+Resources:
+  # VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: MyVPC
 
+  # Public Subnets
   PublicSubnet1:
-    Type: AWS::EC2::Subnet::Id
-    Description: "First public subnet"
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      Tags:
+        - Key: Name
+          Value: PublicSubnet1
 
   PublicSubnet2:
-    Type: AWS::EC2::Subnet::Id
-    Description: "Second public subnet"
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      Tags:
+        - Key: Name
+          Value: PublicSubnet2
 
-  TaskExecutionRoleArn:
-    Type: String
-    Description: "The ARN of the IAM Role for ECS task execution"
+  # Internet Gateway and Routing
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
 
-  ALBSecurityGroupId:
-    Type: AWS::EC2::SecurityGroup::Id
-    Description: "Security Group for Application Load Balancer"
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
 
-  ECSSecurityGroupId:
-    Type: AWS::EC2::SecurityGroup::Id
-    Description: "Security Group for ECS tasks"
+  # Security Groups
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP traffic to ALB
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
 
-Resources:
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access to ECS tasks
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+
+  # Task Execution Role for ECS
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  # ECS Cluster
   ECSCluster:
     Type: AWS::ECS::Cluster
-    Properties: 
+    Properties:
       ClusterName: MyFargateCluster
 
+  # ECR Repository
   ECRRepository:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: my-fastapi-app
 
-  ECSTaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      RequiresCompatibilities:
-        - FARGATE
-      Cpu: '256'
-      Memory: '512'
-      NetworkMode: awsvpc
-      ExecutionRoleArn: !Ref TaskExecutionRoleArn
-      ContainerDefinitions:
-        - Name: fastapi-container
-          Image: !Ref ImageUrl
-          PortMappings:
-            - ContainerPort: 8000
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref LogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
-
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /ecs/fastapi-app
-      RetentionInDays: 7
-
-  ECSService:
-    Type: AWS::ECS::Service
-    DependsOn: ListenerRule
-    Properties:
-      Cluster: !Ref ECSCluster
-      DesiredCount: 1
-      LaunchType: FARGATE
-      TaskDefinition: !Ref ECSTaskDefinition
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroupId
-          Subnets:
-            - !Ref PublicSubnet1
-            - !Ref PublicSubnet2
-      LoadBalancers:
-        - ContainerName: fastapi-container
-          ContainerPort: 8000
-          TargetGroupArn: !Ref TargetGroup
-
-  ApplicationLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      Scheme: internet-facing
-      SecurityGroups:
-        - !Ref ALBSecurityGroupId
-      Subnets:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
-
-  TargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      VpcId: !Ref VpcId
-      Port: 8000
-      Protocol: HTTP
-      TargetType: ip
-      HealthCheckProtocol: HTTP
-      HealthCheckPath: /
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 5
-      UnhealthyThresholdCount: 2
-      Matcher:
-        HttpCode: '200'
-
-  Listener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref TargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
-
-  ListenerRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
-    Properties:
-      Actions:
-        - Type: forward
-          TargetGroupArn: !Ref TargetGroup
-      Conditions:
-        - Field: path-pattern
-          Values: [ "/" ]
-      ListenerArn: !Ref Listener
-      Priority: 1
-
+  # S3 Bucket for files
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref S3BucketName
+      BucketName: !Sub "text-to-speech-${AWS::AccountId}-${AWS::Region}"
       AccessControl: Private
       VersioningConfiguration:
         Status: Enabled
@@ -151,9 +111,29 @@ Resources:
           Value: TextToSpeechS3Bucket
 
 Outputs:
-  ALBDNSName:
-    Description: "DNS Name of the Application Load Balancer"
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
+  VPCId:
+    Description: "VPC ID"
+    Value: !Ref VPC
+
+  PublicSubnet1Id:
+    Description: "Public Subnet 1 ID"
+    Value: !Ref PublicSubnet1
+
+  PublicSubnet2Id:
+    Description: "Public Subnet 2 ID"
+    Value: !Ref PublicSubnet2
+
+  ALBSecurityGroupId:
+    Description: "Security Group ID for ALB"
+    Value: !Ref ALBSecurityGroup
+
+  ECSSecurityGroupId:
+    Description: "Security Group ID for ECS Tasks"
+    Value: !Ref ECSSecurityGroup
+
+  TaskExecutionRoleArn:
+    Description: "Task Execution Role ARN"
+    Value: !GetAtt TaskExecutionRole.Arn
 
   S3BucketNameOutput:
     Description: "Name of the S3 Bucket"
