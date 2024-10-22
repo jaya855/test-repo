@@ -40,59 +40,73 @@ jobs:
             ECR_REPO_URI=$(aws ecr describe-repositories --repository-names $REPO_NAME --query 'repositories[0].repositoryUri' --output text)
           fi
 
-          # Export the repository URI for later steps
           echo "ECR_REPO_URI=$ECR_REPO_URI" >> $GITHUB_ENV
 
-      # Step 4: Deploy CloudFormation stack (unified template)
-      - name: Deploy CloudFormation Stack
-        run: |
-          aws cloudformation deploy \
-            --template-file cloudformation/deploy.yml \
-            --stack-name fastapi-app-stack \
-            --parameter-overrides \
-              ImageUrl=$ECR_REPO_URI:latest \
-            --capabilities CAPABILITY_NAMED_IAM
-
-      # Step 5: Get CloudFormation outputs (S3, IAM Role, ALB DNS)
-      - name: Get CloudFormation Outputs
-        run: |
-          S3_BUCKET_NAME=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" \
-            --output text)
-
-          IAM_ROLE_ARN=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='IAMRoleArn'].OutputValue" \
-            --output text)
-
-          ALB_DNS_NAME=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='ALBDNSName'].OutputValue" \
-            --output text)
-
-          echo "S3_BUCKET_NAME=$S3_BUCKET_NAME" >> $GITHUB_ENV
-          echo "IAM_ROLE_ARN=$IAM_ROLE_ARN" >> $GITHUB_ENV
-          echo "ALB_DNS_NAME=$ALB_DNS_NAME" >> $GITHUB_ENV
-
-      # Step 6: Log in to Amazon ECR
-      - name: Log in to Amazon ECR
-        run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin $ECR_REPO_URI
-
-      # Step 7: Build Docker image
+      # Step 4: Build Docker image
       - name: Build Docker image
         run: |
           docker build -t my-fastapi-app .
           docker tag my-fastapi-app:latest $ECR_REPO_URI:latest
 
-      # Step 8: Push Docker image to Amazon ECR
+      # Step 5: Log in to Amazon ECR and Push Docker image
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REPO_URI
+
       - name: Push Docker image to Amazon ECR
         run: |
           docker push $ECR_REPO_URI:latest
 
-      # Step 9: Update ECS Service with new Docker image
+      # Step 6: Deploy CloudFormation stack (unified template)
+      - name: Deploy CloudFormation Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/deploy.yml \
+            --stack-name fastapi-app-stack \
+            --parameter-overrides ImageUrl=$ECR_REPO_URI:latest \
+            --capabilities CAPABILITY_NAMED_IAM
+
+      # Step 7: Get CloudFormation outputs (VPC, Subnets, IAM Role, SGs, S3)
+      - name: Get CloudFormation Outputs
+        run: |
+          VPC_ID=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='VPCId'].OutputValue" \
+            --output text)
+
+          PUBLIC_SUBNET1=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet1Id'].OutputValue" \
+            --output text)
+
+          PUBLIC_SUBNET2=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet2Id'].OutputValue" \
+            --output text)
+
+          TASK_EXECUTION_ROLE_ARN=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='TaskExecutionRoleArn'].OutputValue" \
+            --output text)
+
+          ALB_SG=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='ALBSecurityGroupId'].OutputValue" \
+            --output text)
+
+          ECS_SG=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='ECSSecurityGroupId'].OutputValue" \
+            --output text)
+
+          echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
+          echo "PUBLIC_SUBNET1=$PUBLIC_SUBNET1" >> $GITHUB_ENV
+          echo "PUBLIC_SUBNET2=$PUBLIC_SUBNET2" >> $GITHUB_ENV
+          echo "TASK_EXECUTION_ROLE_ARN=$TASK_EXECUTION_ROLE_ARN" >> $GITHUB_ENV
+          echo "ALB_SG=$ALB_SG" >> $GITHUB_ENV
+          echo "ECS_SG=$ECS_SG" >> $GITHUB_ENV
+
+      # Step 8: Update ECS Service with new Docker image
       - name: Update ECS Service with new Docker image
         run: |
           aws ecs update-service \
