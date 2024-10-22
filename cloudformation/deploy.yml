@@ -181,6 +181,7 @@ Resources:
               awslogs-group: /ecs/fastapi-app
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
+              awslogs-create-group: true
 
   # ECS Service
   ECSService:
