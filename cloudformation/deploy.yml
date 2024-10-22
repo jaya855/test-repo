@@ -16,7 +16,7 @@ Resources:
         - Key: Name
           Value: MyVPC
 
-  # Public Subnets
+  # Public Subnet 1
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -28,6 +28,7 @@ Resources:
         - Key: Name
           Value: PublicSubnet1
 
+  # Public Subnet 2 (Conditional)
   PublicSubnet2:
     Condition: HasMultipleAZs
     Type: AWS::EC2::Subnet
@@ -40,7 +41,7 @@ Resources:
         - Key: Name
           Value: PublicSubnet2
 
-  # Internet Gateway and Routing
+  # Internet Gateway
   InternetGateway:
     Type: AWS::EC2::InternetGateway
 
@@ -49,6 +50,36 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
+
+  # Route Table and Routes
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  SubnetRouteTableAssociation2:
+    Condition: HasMultipleAZs
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
 
   # Security Groups
   ALBSecurityGroup:
@@ -110,7 +141,7 @@ Conditions:
     Fn::Not:
       - Fn::Equals:
           - Fn::Select [ 1, !GetAZs '' ]
-          - ""
+          - ""  # Condition to check if the second AZ exists
 
 Outputs:
   VPCId:
