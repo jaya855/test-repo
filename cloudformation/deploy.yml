@@ -204,6 +204,13 @@ Resources:
             - !Ref PublicSubnet1
             - !Ref PublicSubnet2
 
+  # CloudWatch Log Group for ECS Task logs
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/fastapi-app
+      RetentionInDays: 7
+
 Outputs:
   ALBDNSName:
     Description: "DNS Name of the Application Load Balancer"
