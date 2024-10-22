@@ -146,13 +146,6 @@ Resources:
     Properties:
       ClusterName: MyFargateCluster
 
-  # Log Group for ECS
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /ecs/fastapi-app
-      RetentionInDays: 7
-
   # ECS Task Execution Role
   TaskExecutionRole:
     Type: AWS::IAM::Role
@@ -192,7 +185,7 @@ Resources:
   # ECS Service
   ECSService:
     Type: AWS::ECS::Service
-    DependsOn: ALBListener
+    DependsOn: ALBListener # Ensuring ALBListener is created before ECS Service
     Properties:
       Cluster: !Ref ECSCluster
       TaskDefinition: !Ref ECSTaskDefinition
