@@ -29,6 +29,7 @@ Resources:
           Value: PublicSubnet1
 
   PublicSubnet2:
+    Condition: HasMultipleAZs
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
@@ -104,6 +105,13 @@ Resources:
         - Key: Name
           Value: TextToSpeechS3Bucket
 
+Conditions:
+  HasMultipleAZs:
+    Fn::Not:
+      - Fn::Equals:
+          - Fn::Select [1, !GetAZs '']
+          - ""
+
 Outputs:
   VPCId:
     Description: "VPC ID"
@@ -114,6 +122,7 @@ Outputs:
     Value: !Ref PublicSubnet1
 
   PublicSubnet2Id:
+    Condition: HasMultipleAZs
     Description: "Public Subnet 2 ID"
     Value: !Ref PublicSubnet2
 
