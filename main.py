@@ -48,7 +48,7 @@ S3_AUDIO_FOLDER = "audio/"
 templates = Jinja2Templates(directory="templates")
 
 # Serve static files (for audio and other static resources)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+#app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Serve the index.html file as the homepage
 @app.get("/", response_class=HTMLResponse)
