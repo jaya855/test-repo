@@ -111,29 +111,3 @@ jobs:
           echo "ALB_SG=$ALB_SG" >> $GITHUB_ENV
           echo "ECS_SG=$ECS_SG" >> $GITHUB_ENV
           echo "S3_BUCKET_NAME=$S3_BUCKET_NAME" >> $GITHUB_ENV
-
-      # Step 8: Update ECS Service with new Docker image
-      - name: Update ECS Service with new Docker image
-        run: |
-          aws ecs update-service \
-            --cluster fastapi-app-cluster \
-            --service fastapi-app-service \
-            --force-new-deployment \
-            --network-configuration "awsvpcConfiguration={subnets=[$PUBLIC_SUBNET1,$PUBLIC_SUBNET2],securityGroups=[$ECS_SG],assignPublicIp=ENABLED}" \
-            --task-definition "fastapi-app-task-def:1"  # Adjust the task definition version as necessary
-
-      # Step 9: Update environment variables for the ECS task definition
-      - name: Update ECS Task Definition with Environment Variables
-        run: |
-          # Fetch the current task definition
-          CURRENT_TASK_DEF=$(aws ecs describe-task-definition --task-definition fastapi-app-task-def)
-          
-          # Update environment variables
-          UPDATED_TASK_DEF=$(echo $CURRENT_TASK_DEF | jq --arg S3_BUCKET_NAME "${{ env.S3_BUCKET_NAME }}" \
-                                                  --arg IAM_ROLE_ARN "${{ env.TASK_EXECUTION_ROLE_ARN }}" \
-                                                  --arg ALB_DNS_NAME "$(aws cloudformation describe-stacks --stack-name fastapi-app-stack --query "Stacks[0].Outputs[?OutputKey=='ALBDNSName'].OutputValue" --output text)" \
-                                                  '.taskDefinition.containerDefinitions[0].environment += [{"name": "S3_BUCKET_NAME", "value": $S3_BUCKET_NAME}, {"name": "IAM_ROLE_ARN", "value": $IAM_ROLE_ARN}, {"name": "ALB_DNS_NAME", "value": $ALB_DNS_NAME}]')
-
-          # Register the new task definition
-          echo $UPDATED_TASK_DEF | jq '.taskDefinition | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' | \
-          aws ecs register-task-definition --cli-input-json file://<(cat)
