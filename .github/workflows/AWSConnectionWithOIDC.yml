@@ -16,7 +16,7 @@ jobs:
     steps:
       # Step 1: Checkout the code
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       # Step 2: Configure AWS credentials with OIDC and Assume Role
       - name: Configure AWS Credentials with OIDC
