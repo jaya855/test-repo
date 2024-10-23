@@ -12,14 +12,15 @@ from botocore.exceptions import NoCredentialsError, ClientError
 import pandas as pd
 import requests
 import uuid
+from os import environ
 
 # Initialize FastAPI app
 app = FastAPI()
 
 # Fetch environment variables for AWS resources
-S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
-IAM_ROLE_ARN = os.getenv('IAM_ROLE_ARN')
-ALB_DNS_NAME = os.getenv('ALB_DNS_NAME')
+S3_BUCKET_NAME = environ.get('S3_BUCKET_NAME')
+IAM_ROLE_ARN = environ.get('IAM_ROLE_ARN')
+ALB_DNS_NAME = environ.get('ALB_DNS_NAME')
 
 # Set up CORS middleware to allow requests from specific origins
 app.add_middleware(
