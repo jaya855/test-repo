@@ -99,14 +99,20 @@ jobs:
             --query "Stacks[0].Outputs[?OutputKey=='ECSSecurityGroupId'].OutputValue" \
             --output text)
 
+          S3_BUCKET_NAME=$(aws cloudformation describe-stacks \
+            --stack-name fastapi-app-stack \
+            --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" \
+            --output text)
+
           echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
           echo "PUBLIC_SUBNET1=$PUBLIC_SUBNET1" >> $GITHUB_ENV
           echo "PUBLIC_SUBNET2=$PUBLIC_SUBNET2" >> $GITHUB_ENV
           echo "TASK_EXECUTION_ROLE_ARN=$TASK_EXECUTION_ROLE_ARN" >> $GITHUB_ENV
           echo "ALB_SG=$ALB_SG" >> $GITHUB_ENV
           echo "ECS_SG=$ECS_SG" >> $GITHUB_ENV
+          echo "S3_BUCKET_NAME=$S3_BUCKET_NAME" >> $GITHUB_ENV
 
-      # Step 8: Update ECS Service with new Docker image and environment variables
+      # Step 8: Update ECS Service with new Docker image
       - name: Update ECS Service with new Docker image
         run: |
           aws ecs update-service \
@@ -123,9 +129,9 @@ jobs:
           CURRENT_TASK_DEF=$(aws ecs describe-task-definition --task-definition fastapi-app-task-def)
           
           # Update environment variables
-          UPDATED_TASK_DEF=$(echo $CURRENT_TASK_DEF | jq --arg S3_BUCKET_NAME "${{ secrets.S3_BUCKET_NAME }}" \
-                                                  --arg IAM_ROLE_ARN "${{ secrets.IAM_ROLE_ARN }}" \
-                                                  --arg ALB_DNS_NAME "${{ secrets.ALB_DNS_NAME }}" \
+          UPDATED_TASK_DEF=$(echo $CURRENT_TASK_DEF | jq --arg S3_BUCKET_NAME "${{ env.S3_BUCKET_NAME }}" \
+                                                  --arg IAM_ROLE_ARN "${{ env.TASK_EXECUTION_ROLE_ARN }}" \
+                                                  --arg ALB_DNS_NAME "$(aws cloudformation describe-stacks --stack-name fastapi-app-stack --query "Stacks[0].Outputs[?OutputKey=='ALBDNSName'].OutputValue" --output text)" \
                                                   '.taskDefinition.containerDefinitions[0].environment += [{"name": "S3_BUCKET_NAME", "value": $S3_BUCKET_NAME}, {"name": "IAM_ROLE_ARN", "value": $IAM_ROLE_ARN}, {"name": "ALB_DNS_NAME", "value": $ALB_DNS_NAME}]')
 
           # Register the new task definition
