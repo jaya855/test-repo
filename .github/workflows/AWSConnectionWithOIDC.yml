@@ -22,8 +22,9 @@ jobs:
       - name: Configure AWS Credentials with OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.OIDC_ROLE }}
-          aws-region: ${{ secrets.AWS_REGION }}
+            role-to-assume: arn:aws:iam::121263836368:role/tts-oidc-role
+            aws-region: ${{ secrets.AWS_REGION }}
+
 
       # Step 3: Create or Get ECR Repository
       - name: Create or Get ECR Repository
