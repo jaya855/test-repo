@@ -160,6 +160,18 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
+  # S3 Bucket for storing audio and SSML files
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-s3bucket"
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 30
+
   # ECS Task Definition
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -182,6 +194,13 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
               awslogs-create-group: true
+          Environment:  # Pass environment variables to the container
+            - Name: S3_BUCKET_NAME
+              Value: !Ref S3Bucket
+            - Name: IAM_ROLE_ARN
+              Value: !GetAtt TaskExecutionRole.Arn
+            - Name: ALB_DNS_NAME
+              Value: !GetAtt ApplicationLoadBalancer.DNSName
 
   # ECS Service
   ECSService:
@@ -216,3 +235,6 @@ Outputs:
   ALBDNSName:
     Description: "DNS Name of the Application Load Balancer"
     Value: !GetAtt ApplicationLoadBalancer.DNSName
+  S3BucketName:
+    Description: "Name of the S3 Bucket"
+    Value: !Ref S3Bucket
