@@ -24,7 +24,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/tts-oidc-role
           aws-region: ${{ secrets.AWS_REGION }}
-          
+
       # Step 3: Create or Get ECR Repository
       - name: Create or Get ECR Repository
         id: ecr
