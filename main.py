@@ -2,10 +2,6 @@ import re
 import os  # For fetching environment variables
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-import pandas as pd
-import requests
-import uuid
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
 import logging
@@ -13,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from langdetect import detect, LangDetectException
 import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
+import pandas as pd
+import requests
+import uuid
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -34,11 +33,6 @@ app.add_middleware(
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
-# Constants for Azure endpoint
-AZURE_REGION = "eastus"
-AZURE_ENDPOINT = f"https://{AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
-AZURE_VOICES_LIST_ENDPOINT = f"https://{AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/voices/list"
-
 # S3 bucket configuration (dynamically fetched from environment variables)
 S3_INPUT_FOLDER = "input/"
 S3_SSML_FOLDER = "ssml/"
@@ -46,9 +40,6 @@ S3_AUDIO_FOLDER = "audio/"
 
 # Set up templates folder for serving HTML files
 templates = Jinja2Templates(directory="templates")
-
-# Serve static files (for audio and other static resources)
-#app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Serve the index.html file as the homepage
 @app.get("/", response_class=HTMLResponse)
@@ -294,4 +285,3 @@ async def upload_csv(file: UploadFile = File(...), source: str = Form(...)):
     except Exception as e:
         logging.error(f"Error processing file. {str(e)}")
         return {"error": f"Error processing file. {str(e)}"}
-
