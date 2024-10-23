@@ -3,6 +3,15 @@ Parameters:
   ImageUrl:
     Type: String
     Description: "Docker image URL for the FastAPI app"
+  S3BucketName:
+    Type: String
+    Description: "Name of the S3 bucket"
+  IAMRoleArn:
+    Type: String
+    Description: "ARN of the IAM role"
+  ALBDNSName:
+    Type: String
+    Description: "DNS name of the Application Load Balancer"
 
 Resources:
   # VPC
@@ -164,7 +173,7 @@ Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "${AWS::StackName}-s3bucket"
+      BucketName: !Ref S3BucketName  # Use parameter
       VersioningConfiguration:
         Status: Enabled
       LifecycleConfiguration:
@@ -196,11 +205,11 @@ Resources:
               awslogs-create-group: true
           Environment:  # Pass environment variables to the container
             - Name: S3_BUCKET_NAME
-              Value: !Ref S3Bucket
+              Value: !Ref S3BucketName  # Reference parameter
             - Name: IAM_ROLE_ARN
-              Value: !GetAtt TaskExecutionRole.Arn
+              Value: !Ref IAMRoleArn  # Reference parameter
             - Name: ALB_DNS_NAME
-              Value: !GetAtt ApplicationLoadBalancer.DNSName
+              Value: !Ref ALBDNSName  # Reference parameter
 
   # ECS Service
   ECSService:
