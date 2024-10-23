@@ -63,7 +63,7 @@ jobs:
           aws cloudformation deploy \
             --template-file cloudformation/deploy.yml \
             --stack-name fastapi-app-stack \
-            --parameter-overrides ImageUrl=$ECR_REPO_URI:latest TaskExecutionRoleArn=arn:aws:iam::121263836368:role/tts-role \
+            --parameter-overrides ImageUrl=$ECR_REPO_URI:latest TaskExecutionRoleArn=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/tts-oidc-role \
             --capabilities CAPABILITY_NAMED_IAM
 
       # Step 7: Get CloudFormation outputs (VPC, Subnets, IAM Role, SGs, S3)
