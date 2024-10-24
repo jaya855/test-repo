@@ -159,7 +159,7 @@ Resources:
             Action: sts:AssumeRole
           - Effect: Allow
             Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/${AWS::StackName}-TaskRole*"  # Dynamic reference
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/${AWS::StackName}-TaskRole-${AWS::Region}-${AWS::StackId}"  # Exact ARN
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
@@ -185,7 +185,7 @@ Resources:
             Action: sts:AssumeRole
           - Effect: Allow
             Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/${AWS::StackName}-TaskExecutionRole*"  # Dynamic reference
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/${AWS::StackName}-TaskExecutionRole-${AWS::Region}-${AWS::StackId}"  # Exact ARN
             Action: sts:AssumeRole
       Policies:
         - PolicyName: "ECSAppPolicy"
