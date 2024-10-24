@@ -82,9 +82,6 @@
         color: red;
         margin-top: 20px;
       }
-      .hidden {
-        display: none;
-      }
     </style>
   </head>
   <body>
@@ -199,13 +196,11 @@
           const result = await response.json();
 
           if (result.english_audio_link && result.language_audio_link) {
-            // Set audio player and download button for English audio
             englishAudioPlayer.src = result.english_audio_link;
             englishDownloadBtn.href = result.english_audio_link;
             englishDownloadBtn.download = "english_audio.wav";
             englishAudioContainer.style.display = "block";
 
-            // Set audio player and download button for language-specific audio
             languageAudioPlayer.src = result.language_audio_link;
             languageDownloadBtn.href = result.language_audio_link;
             languageDownloadBtn.download = "language_audio.wav";
