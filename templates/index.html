@@ -134,13 +134,24 @@
       const languageDownloadBtn = document.getElementById("languageDownloadBtn");
       const errorDiv = document.getElementById("error");
 
-      // Manually set the ALB DNS Name
-      const ALB_DNS_NAME = "http://fastap-appli-6bgawigd1lyk-1910048824.ap-south-1.elb.amazonaws.com";
+      // Fetch the ALB DNS Name from the server
+      let ALB_DNS_NAME = "";
 
-      // Click to open file selector
+      const fetchALBDNSName = async () => {
+        try {
+          const response = await fetch("/api/alb-dns");
+          const data = await response.json();
+          ALB_DNS_NAME = data.dnsName || "";
+        } catch (error) {
+          console.error("Failed to fetch ALB DNS:", error);
+          ALB_DNS_NAME = "http://fastap-appli-6bgawigd1lyk-1910048824.ap-south-1.elb.amazonaws.com"; // Fallback
+        }
+      };
+
+      fetchALBDNSName();
+
       uploadArea.addEventListener("click", () => fileInput.click());
 
-      // File drag-and-drop functionality
       uploadArea.addEventListener("dragover", (e) => {
         e.preventDefault();
         uploadArea.style.backgroundColor = "#e7f3ff";
@@ -160,7 +171,6 @@
         }
       });
 
-      // Display selected file name when file is chosen
       fileInput.addEventListener("change", () => {
         const file = fileInput.files[0];
         if (file) {
@@ -168,7 +178,6 @@
         }
       });
 
-      // Convert button click event
       convertBtn.addEventListener("click", async () => {
         const file = fileInput.files[0];
         const language = languageInput.value.trim();
@@ -187,7 +196,6 @@
         formData.append("source", language);
 
         try {
-          // Use manually set ALB DNS
           const response = await fetch(`${ALB_DNS_NAME}/upload-csv`, {
             method: "POST",
             body: formData,
