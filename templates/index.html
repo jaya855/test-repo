@@ -9,7 +9,6 @@
       rel="stylesheet"
     />
     <style>
-      /* Same styles as before */
       body {
         display: flex;
         justify-content: center;
@@ -107,7 +106,6 @@
 
       <button id="convertBtn" class="btn">Convert to Audio</button>
 
-      <!-- Container for English audio -->
       <div id="englishAudioContainer" class="audio-container">
         <h3>English Audio:</h3>
         <audio id="englishAudioPlayer" controls></audio>
@@ -115,7 +113,6 @@
         <a id="englishDownloadBtn" class="btn" download>Download English Audio</a>
       </div>
 
-      <!-- Container for Language-specific audio -->
       <div id="languageAudioContainer" class="audio-container">
         <h3>Language-Specific Audio:</h3>
         <audio id="languageAudioPlayer" controls></audio>
@@ -140,24 +137,8 @@
       const languageDownloadBtn = document.getElementById("languageDownloadBtn");
       const errorDiv = document.getElementById("error");
 
-      // ALB DNS Name - dynamically fetched or defined via environment
-      let ALB_DNS_NAME = "";  // Initialize the ALB DNS as empty
-
-      // Fetch the ALB DNS name from the server or configuration
-      const fetchALBDNSName = async () => {
-        try {
-          // Replace with the correct API to fetch the ALB DNS
-          const response = await fetch("/api/alb-dns"); // Assuming you have an API to provide the DNS
-          const data = await response.json();
-          ALB_DNS_NAME = data.dnsName || "";
-        } catch (error) {
-          console.error("Failed to fetch ALB DNS:", error);
-          ALB_DNS_NAME = "http://localhost:8000"; // Fallback to localhost in case of error
-        }
-      };
-
-      // Immediately fetch ALB DNS when the script loads
-      fetchALBDNSName();
+      // Manually set the ALB DNS Name
+      const ALB_DNS_NAME = "http://fastap-appli-sgibrsuramzy-1999086689.ap-south-1.elb.amazonaws.com";
 
       // Click to open file selector
       uploadArea.addEventListener("click", () => fileInput.click());
@@ -209,7 +190,7 @@
         formData.append("source", language);
 
         try {
-          // Use dynamically fetched ALB DNS
+          // Use manually set ALB DNS
           const response = await fetch(`${ALB_DNS_NAME}/upload-csv`, {
             method: "POST",
             body: formData,
