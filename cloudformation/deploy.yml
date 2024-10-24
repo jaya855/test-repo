@@ -146,7 +146,7 @@ Resources:
     Properties:
       ClusterName: MyFargateCluster
 
-# ECS Task Execution Role
+  # ECS Task Execution Role
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -157,10 +157,6 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
-          - Effect: Allow
-            Principal:
-              AWS: !GetAtt TaskRole.Arn  # Reference the TaskRole ARN dynamically
-            Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Policies:
@@ -170,7 +166,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: secretsmanager:GetSecretValue
-                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:azure-secrets-*" 
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:azure-secrets-*"
 
   # ECS Task Role
   TaskRole:
@@ -182,10 +178,6 @@ Resources:
           - Effect: Allow
             Principal:
               Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-          - Effect: Allow
-            Principal:
-              AWS: !GetAtt TaskExecutionRole.Arn  # Reference the TaskExecutionRole ARN dynamically
             Action: sts:AssumeRole
       Policies:
         - PolicyName: "ECSAppPolicy"
@@ -201,7 +193,7 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}/*"
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
-                  
+
   # S3 Bucket for storing audio and SSML files
   S3Bucket:
     Type: AWS::S3::Bucket
