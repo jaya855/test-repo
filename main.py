@@ -13,9 +13,14 @@ import pandas as pd
 import requests
 import uuid
 from os import environ
+from fastapi import FastAPI
+import os
 
-# Initialize FastAPI app
 app = FastAPI()
+
+@app.get("/api/alb-dns")
+async def get_alb_dns():
+    return {"dnsName": environ.get("ALB_DNS_NAME")}
 
 # Fetch environment variables for AWS resources
 S3_BUCKET_NAME = environ.get('S3_BUCKET_NAME')
