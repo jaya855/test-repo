@@ -22,6 +22,11 @@ S3_BUCKET_NAME = environ.get('S3_BUCKET_NAME')
 IAM_ROLE_ARN = environ.get('IAM_ROLE_ARN')
 ALB_DNS_NAME = environ.get('ALB_DNS_NAME')
 
+# Print the fetched environment variables for debugging
+print(f"S3_BUCKET_NAME: {S3_BUCKET_NAME}")
+print(f"IAM_ROLE_ARN: {IAM_ROLE_ARN}")
+print(f"ALB_DNS_NAME: {ALB_DNS_NAME}")
+
 # Set up CORS middleware to allow requests from specific origins
 app.add_middleware(
     CORSMiddleware,
