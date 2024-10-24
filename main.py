@@ -235,10 +235,12 @@ def find_transcription_column(df, locale_code):
 async def upload_csv(file: UploadFile = File(...), source: str = Form(...)):
     try:
         source_cleaned = source.strip().replace("\\", "").replace("\n", "").replace("\t", "")
+        print(source_cleaned)
 
         contents = await file.read()
         try:
             df = pd.read_csv(pd.io.common.StringIO(contents.decode("utf-8")), encoding="utf-8")
+            print(df.describe())
         except UnicodeDecodeError:
             logging.error("File encoding is not supported. Please ensure the file is UTF-8 encoded.")
             return {"error": "File encoding is not supported. Please ensure the file is UTF-8 encoded."}
