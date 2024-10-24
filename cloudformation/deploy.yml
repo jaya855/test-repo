@@ -3,6 +3,9 @@ Parameters:
   ImageUrl:
     Type: String
     Description: "Docker image URL for the FastAPI app"
+  TaskExecutionRoleArn:
+    Type: String
+    Description: "ARN of the existing Task Execution Role (tts-role)"
 
 Resources:
   # VPC
@@ -146,20 +149,6 @@ Resources:
     Properties:
       ClusterName: MyFargateCluster
 
-  # ECS Task Execution Role
-  TaskExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-
   # S3 Bucket for storing audio and SSML files
   S3Bucket:
     Type: AWS::S3::Bucket
@@ -181,7 +170,7 @@ Resources:
       Cpu: '256'
       Memory: '512'
       NetworkMode: awsvpc
-      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      ExecutionRoleArn: !Ref TaskExecutionRoleArn  # Reference the existing role ARN
       ContainerDefinitions:
         - Name: fastapi-container
           Image: !Ref ImageUrl  # Use parameter directly
@@ -198,7 +187,7 @@ Resources:
             - Name: S3_BUCKET_NAME
               Value: !Ref S3Bucket  # Reference the created S3 bucket
             - Name: IAM_ROLE_ARN
-              Value: !GetAtt TaskExecutionRole.Arn  # Reference the created IAM role
+              Value: !Ref TaskExecutionRoleArn  # Reference the existing IAM role ARN
             - Name: ALB_DNS_NAME
               Value: !GetAtt ApplicationLoadBalancer.DNSName  # Reference the ALB DNS name
 
@@ -240,4 +229,4 @@ Outputs:
     Value: !Ref S3Bucket
   TaskExecutionRoleArn:
     Description: "ARN of the Task Execution Role"
-    Value: !GetAtt TaskExecutionRole.Arn
+    Value: !Ref TaskExecutionRoleArn  # Output the existing role ARN
