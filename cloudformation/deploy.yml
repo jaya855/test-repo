@@ -159,7 +159,7 @@ Resources:
             Action: sts:AssumeRole
           - Effect: Allow
             Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/${AWS::StackName}-TaskRole-${AWS::Region}-${AWS::StackId}"  # Exact ARN
+              AWS: "arn:aws:iam::121263836368:role/fastapi-app-stack-TaskExecutionRole-7kGWLRaE6KO5"
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
@@ -170,7 +170,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: secretsmanager:GetSecretValue
-                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:azure-secrets-*"
+                Resource: arn:aws:secretsmanager:ap-south-1:121263836368:secret:azure-secrets-aNvvva
 
   # ECS Task Role
   TaskRole:
@@ -185,7 +185,7 @@ Resources:
             Action: sts:AssumeRole
           - Effect: Allow
             Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/${AWS::StackName}-TaskExecutionRole-${AWS::Region}-${AWS::StackId}"  # Exact ARN
+              AWS: "arn:aws:iam::121263836368:role/fastapi-app-stack-TaskRole-f4Bd8THommc1"
             Action: sts:AssumeRole
       Policies:
         - PolicyName: "ECSAppPolicy"
