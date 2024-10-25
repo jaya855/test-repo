@@ -157,10 +157,6 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
-          - Effect: Allow
-            Principal:
-              AWS: "arn:aws:iam::121263836368:role/fastapi-app-stack-TaskExecutionRole-7kGWLRaE6KO5"
-            Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Policies:
@@ -182,10 +178,6 @@ Resources:
           - Effect: Allow
             Principal:
               Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-          - Effect: Allow
-            Principal:
-              AWS: "arn:aws:iam::121263836368:role/fastapi-app-stack-TaskRole-f4Bd8THommc1"
             Action: sts:AssumeRole
       Policies:
         - PolicyName: "ECSAppPolicy"
@@ -224,10 +216,10 @@ Resources:
       Memory: '512'
       NetworkMode: awsvpc
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
-      TaskRoleArn: !GetAtt TaskRole.Arn  # Reference the created Task Role
+      TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
         - Name: fastapi-container
-          Image: !Ref ImageUrl  # Use parameter directly
+          Image: !Ref ImageUrl
           PortMappings:
             - ContainerPort: 8000
           LogConfiguration:
@@ -239,16 +231,16 @@ Resources:
               awslogs-create-group: true
           Environment:
             - Name: S3_BUCKET_NAME
-              Value: !Ref S3Bucket  # Reference the created S3 bucket
+              Value: !Ref S3Bucket
             - Name: IAM_ROLE_ARN
-              Value: !GetAtt TaskExecutionRole.Arn  # Reference the created IAM role
+              Value: !GetAtt TaskExecutionRole.Arn
             - Name: ALB_DNS_NAME
-              Value: !GetAtt ApplicationLoadBalancer.DNSName  # Reference the ALB DNS name
+              Value: !GetAtt ApplicationLoadBalancer.DNSName
 
   # ECS Service
   ECSService:
     Type: AWS::ECS::Service
-    DependsOn: ALBListener  # Ensuring ALBListener is created before ECS Service
+    DependsOn: ALBListener
     Properties:
       Cluster: !Ref ECSCluster
       TaskDefinition: !Ref ECSTaskDefinition
