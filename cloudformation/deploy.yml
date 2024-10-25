@@ -196,7 +196,7 @@ Resources:
               Value: !Ref S3Bucket
             - Name: ALB_DNS_NAME
               Value: !GetAtt ApplicationLoadBalancer.DNSName
-            - Name: ROLE_ARN  # Explicit environment variable for RoleArn
+            - Name: IAM_ROLE_ARN  # Environment variable to store IAM role ARN for the application
               Value: !Ref TTSRoleArn
 
   # ECS Service
