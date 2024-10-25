@@ -146,7 +146,7 @@ Resources:
     Properties:
       ClusterName: MyFargateCluster
 
-  # ECS Task Execution Role
+  # ECS Task Execution Role (no cross-reference initially)
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -159,16 +159,8 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-      Policies:
-        - PolicyName: azure-secrets-policy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action: secretsmanager:GetSecretValue
-                Resource: arn:aws:secretsmanager:ap-south-1:121263836368:secret:azure-secrets-aNvvva
 
-  # ECS Task Role
+  # ECS Task Role (no cross-reference initially)
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -193,6 +185,40 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}/*"
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
+
+  # Update Task Execution Role trust relationship to allow TaskRole to assume it
+  UpdateTaskExecutionRoleTrustPolicy:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref TaskExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt TaskRole.Arn  # Allow TaskRole to assume TaskExecutionRole
+            Action: sts:AssumeRole
+
+  # Update Task Role trust relationship to allow TaskExecutionRole to assume it
+  UpdateTaskRoleTrustPolicy:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref TaskRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt TaskExecutionRole.Arn  # Allow TaskExecutionRole to assume TaskRole
+            Action: sts:AssumeRole
 
   # S3 Bucket for storing audio and SSML files
   S3Bucket:
@@ -265,36 +291,6 @@ Resources:
     Properties:
       LogGroupName: /ecs/fastapi-app
       RetentionInDays: 7
-
-  # Update Task Execution Role AssumeRole Policy
-  UpdateTaskExecutionRoleAssumePolicy:
-    Type: Custom::UpdateAssumeRolePolicy
-    DependsOn: TaskExecutionRole
-    Properties:
-      ServiceToken: !GetAtt TaskRole.Arn
-      RoleName: !Ref TaskExecutionRole
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              AWS: !GetAtt TaskRole.Arn
-            Action: sts:AssumeRole
-
-  # Update Task Role AssumeRole Policy
-  UpdateTaskRoleAssumePolicy:
-    Type: Custom::UpdateAssumeRolePolicy
-    DependsOn: TaskRole
-    Properties:
-      ServiceToken: !GetAtt TaskExecutionRole.Arn
-      RoleName: !Ref TaskRole
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              AWS: !GetAtt TaskExecutionRole.Arn
-            Action: sts:AssumeRole
 
 Outputs:
   ALBDNSName:
