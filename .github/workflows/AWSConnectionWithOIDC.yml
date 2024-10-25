@@ -60,13 +60,16 @@ jobs:
       # Step 6: Deploy CloudFormation stack (unified template)
       - name: Deploy CloudFormation Stack
         run: |
+          # Retrieve TTS Role ARN dynamically
+          TTS_ROLE_ARN=$(aws iam get-role --role-name "tts-role" --query "Role.Arn" --output text)
+
           aws cloudformation deploy \
             --template-file cloudformation/deploy.yml \
             --stack-name fastapi-app-stack \
-            --parameter-overrides ImageUrl=$ECR_REPO_URI:latest TaskExecutionRoleArn=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/tts-oidc-role \
+            --parameter-overrides ImageUrl=$ECR_REPO_URI:latest TaskExecutionRoleArn=$TTS_ROLE_ARN \
             --capabilities CAPABILITY_NAMED_IAM
 
-      # Step 7: Get CloudFormation outputs (VPC, Subnets, IAM Role, SGs, S3)
+      # Step 7: Get CloudFormation outputs and pass as environment variables
       - name: Get CloudFormation Outputs
         run: |
           VPC_ID=$(aws cloudformation describe-stacks \
