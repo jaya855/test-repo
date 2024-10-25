@@ -57,60 +57,14 @@ jobs:
         run: |
           docker push $ECR_REPO_URI:latest
 
-      # Step 6: Deploy CloudFormation stack (unified template)
-      - name: Deploy CloudFormation Stack
+      # Step 6: Retrieve TTS Role ARN dynamically and Deploy CloudFormation Stack
+      - name: Retrieve TTS Role ARN and Deploy CloudFormation Stack
         run: |
-          # Retrieve TTS Role ARN dynamically
+          # Retrieve TTS Role ARN
           TTS_ROLE_ARN=$(aws iam get-role --role-name "tts-role" --query "Role.Arn" --output text)
 
           aws cloudformation deploy \
             --template-file cloudformation/deploy.yml \
             --stack-name fastapi-app-stack \
-            --parameter-overrides ImageUrl=$ECR_REPO_URI:latest TaskExecutionRoleArn=$TTS_ROLE_ARN \
+            --parameter-overrides ImageUrl=$ECR_REPO_URI:latest TTSRoleArn=$TTS_ROLE_ARN \
             --capabilities CAPABILITY_NAMED_IAM
-
-      # Step 7: Get CloudFormation outputs and pass as environment variables
-      - name: Get CloudFormation Outputs
-        run: |
-          VPC_ID=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='VPCId'].OutputValue" \
-            --output text)
-
-          PUBLIC_SUBNET1=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet1Id'].OutputValue" \
-            --output text)
-
-          PUBLIC_SUBNET2=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet2Id'].OutputValue" \
-            --output text)
-
-          TASK_EXECUTION_ROLE_ARN=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='TaskExecutionRoleArn'].OutputValue" \
-            --output text)
-
-          ALB_SG=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='ALBSecurityGroupId'].OutputValue" \
-            --output text)
-
-          ECS_SG=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='ECSSecurityGroupId'].OutputValue" \
-            --output text)
-
-          S3_BUCKET_NAME=$(aws cloudformation describe-stacks \
-            --stack-name fastapi-app-stack \
-            --query "Stacks[0].Outputs[?OutputKey=='S3BucketName'].OutputValue" \
-            --output text)
-
-          echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
-          echo "PUBLIC_SUBNET1=$PUBLIC_SUBNET1" >> $GITHUB_ENV
-          echo "PUBLIC_SUBNET2=$PUBLIC_SUBNET2" >> $GITHUB_ENV
-          echo "TASK_EXECUTION_ROLE_ARN=$TASK_EXECUTION_ROLE_ARN" >> $GITHUB_ENV
-          echo "ALB_SG=$ALB_SG" >> $GITHUB_ENV
-          echo "ECS_SG=$ECS_SG" >> $GITHUB_ENV
-          echo "S3_BUCKET_NAME=$S3_BUCKET_NAME" >> $GITHUB_ENV
