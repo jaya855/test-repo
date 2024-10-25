@@ -130,26 +130,16 @@ Resources:
         HttpCode: '200'
 
   # ALB Listener
-  ALBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref TargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
-
-  # ECS Cluster
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: MyFargateCluster
 
-  # ECS Task Execution Role (no cross-reference initially)
+  # ECS Task Execution Role (initial trust relationship without Role B)
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: TaskExecutionRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -160,10 +150,11 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
-  # ECS Task Role (no cross-reference initially)
+  # ECS Task Role (initial trust relationship without Role A)
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: TaskRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -186,40 +177,113 @@ Resources:
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}/*"
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
 
-  # Update the Task Execution Role Trust Relationship directly (without creating a new role)
-  UpdateTaskExecutionRoleTrustPolicy:
+  # Lambda Execution Role for updating trust policies
+  LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Ref TaskExecutionRole  # Refer to the existing TaskExecutionRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
-              Service: ecs-tasks.amazonaws.com
+              Service: lambda.amazonaws.com
             Action: sts:AssumeRole
-          - Effect: Allow
-            Principal:
-              AWS: !GetAtt TaskRole.Arn  # Allow TaskRole to assume TaskExecutionRole
-            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: IAMPolicyUpdate
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "iam:UpdateAssumeRolePolicy"
+                Resource:
+                  - !GetAtt TaskExecutionRole.Arn
+                  - !GetAtt TaskRole.Arn
 
-  # Update the Task Role Trust Relationship directly (without creating a new role)
-  UpdateTaskRoleTrustPolicy:
-    Type: AWS::IAM::Role
+  # Lambda function to update mutual trust policies for TaskExecutionRole and TaskRole
+  UpdateTrustLambdaFunction:
+    Type: AWS::Lambda::Function
     Properties:
-      RoleName: !Ref TaskRole  # Refer to the existing TaskRole
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-          - Effect: Allow
-            Principal:
-              AWS: !GetAtt TaskExecutionRole.Arn  # Allow TaskExecutionRole to assume TaskRole
-            Action: sts:AssumeRole
+      Handler: index.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
 
+          def lambda_handler(event, context):
+              iam = boto3.client('iam')
+              role_a_arn = event['ResourceProperties']['RoleAArn']
+              role_b_arn = event['ResourceProperties']['RoleBArn']
+              role_a_name = event['ResourceProperties']['RoleAName']
+              role_b_name = event['ResourceProperties']['RoleBName']
+
+              # Update Role A to trust Role B
+              iam.update_assume_role_policy(
+                  RoleName=role_a_name,
+                  PolicyDocument=json.dumps({
+                      "Version": "2012-10-17",
+                      "Statement": [
+                          {
+                              "Effect": "Allow",
+                              "Principal": {
+                                  "Service": "ecs-tasks.amazonaws.com"
+                              },
+                              "Action": "sts:AssumeRole"
+                          },
+                          {
+                              "Effect": "Allow",
+                              "Principal": {
+                                  "AWS": role_b_arn
+                              },
+                              "Action": "sts:AssumeRole"
+                          }
+                      ]
+                  })
+              )
+
+              # Update Role B to trust Role A
+              iam.update_assume_role_policy(
+                  RoleName=role_b_name,
+                  PolicyDocument=json.dumps({
+                      "Version": "2012-10-17",
+                      "Statement": [
+                          {
+                              "Effect": "Allow",
+                              "Principal": {
+                                  "Service": "ecs-tasks.amazonaws.com"
+                              },
+                              "Action": "sts:AssumeRole"
+                          },
+                          {
+                              "Effect": "Allow",
+                              "Principal": {
+                                  "AWS": role_a_arn
+                              },
+                              "Action": "sts:AssumeRole"
+                          }
+                      ]
+                  })
+
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Trust policies updated successfully.')
+              }
+
+  # Custom Resource to trigger Lambda after Role creation
+  UpdateTrustPolicy:
+    Type: Custom::UpdateTrustPolicy
+    DependsOn:
+      - TaskExecutionRole
+      - TaskRole
+    Properties:
+      ServiceToken: !GetAtt UpdateTrustLambdaFunction.Arn
+      RoleAArn: !GetAtt TaskExecutionRole.Arn
+      RoleBArn: !GetAtt TaskRole.Arn
+      RoleAName: !Ref TaskExecutionRole
+      RoleBName: !Ref TaskRole
+ 
   # S3 Bucket for storing audio and SSML files
   S3Bucket:
     Type: AWS::S3::Bucket
