@@ -186,11 +186,11 @@ Resources:
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}/*"
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
 
-  # Update Task Execution Role trust relationship to allow TaskRole to assume it
+  # Update the Task Execution Role Trust Relationship directly (without creating a new role)
   UpdateTaskExecutionRoleTrustPolicy:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Ref TaskExecutionRole
+      RoleName: !Ref TaskExecutionRole  # Refer to the existing TaskExecutionRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -203,11 +203,11 @@ Resources:
               AWS: !GetAtt TaskRole.Arn  # Allow TaskRole to assume TaskExecutionRole
             Action: sts:AssumeRole
 
-  # Update Task Role trust relationship to allow TaskExecutionRole to assume it
+  # Update the Task Role Trust Relationship directly (without creating a new role)
   UpdateTaskRoleTrustPolicy:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Ref TaskRole
+      RoleName: !Ref TaskRole  # Refer to the existing TaskRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
