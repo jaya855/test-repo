@@ -149,6 +149,25 @@ Resources:
     Properties:
       ClusterName: MyFargateCluster
 
+  # S3 Bucket for storing audio and SSML files
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 30
+
+  # CloudWatch Log Group for ECS Task logs
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/fastapi-app
+      RetentionInDays: 7
+
   # ECS Task Definition using TTSRoleArn parameter for both ExecutionRoleArn and TaskRoleArn
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -171,12 +190,9 @@ Resources:
               awslogs-group: /ecs/fastapi-app
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
-              awslogs-create-group: true
           Environment:
             - Name: S3_BUCKET_NAME
               Value: !Ref S3Bucket
-            - Name: IAM_ROLE_ARN
-              Value: !Ref TTSRoleArn
             - Name: ALB_DNS_NAME
               Value: !GetAtt ApplicationLoadBalancer.DNSName
 
@@ -201,13 +217,6 @@ Resources:
           Subnets:
             - !Ref PublicSubnet1
             - !Ref PublicSubnet2
-
-  # CloudWatch Log Group for ECS Task logs
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /ecs/fastapi-app
-      RetentionInDays: 7
 
 Outputs:
   ALBDNSName:
