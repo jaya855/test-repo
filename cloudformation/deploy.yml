@@ -194,6 +194,36 @@ Resources:
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}/*"
                   - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
 
+  # Update Task Execution Role Trust Policy
+  TaskExecutionTrustPolicyUpdate:
+    Type: AWS::IAM::Policy
+    Properties: 
+      PolicyName: TaskExecutionRoleTrustPolicyUpdate
+      Roles: 
+        - !Ref TaskExecutionRole
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal: 
+              AWS: !GetAtt TaskRole.Arn
+
+  # Update Task Role Trust Policy
+  TaskRoleTrustPolicyUpdate:
+    Type: AWS::IAM::Policy
+    Properties: 
+      PolicyName: TaskRoleTrustPolicyUpdate
+      Roles: 
+        - !Ref TaskRole
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal: 
+              AWS: !GetAtt TaskExecutionRole.Arn
+
   # S3 Bucket for storing audio and SSML files
   S3Bucket:
     Type: AWS::S3::Bucket
