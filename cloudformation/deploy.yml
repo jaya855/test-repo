@@ -3,6 +3,9 @@ Parameters:
   ImageUrl:
     Type: String
     Description: "Docker image URL for the FastAPI app"
+  TTSRoleArn:
+    Type: String
+    Description: "ARN of the tts-role to use for ECS Task and Execution Role"
 
 Resources:
   # VPC
@@ -146,168 +149,7 @@ Resources:
     Properties:
       ClusterName: MyFargateCluster
 
-  # ECS Task Execution Role (initial trust relationship without Role B)
-  TaskExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: TaskExecutionRole
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-
-  # ECS Task Role (initial trust relationship without Role A)
-  TaskRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: TaskRole
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: "ECSAppPolicy"
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - "s3:PutObject"
-                  - "s3:PutObjectAcl"
-                  - "s3:GetObject"
-                  - "s3:ListBucket"
-                Resource:
-                  - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}/*"
-                  - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
-
-  # Lambda Execution Role for updating trust policies
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: IAMPolicyUpdate
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - "iam:UpdateAssumeRolePolicy"
-                Resource:
-                  - !GetAtt TaskExecutionRole.Arn
-                  - !GetAtt TaskRole.Arn
-
-  # Lambda function to update mutual trust policies for TaskExecutionRole and TaskRole
-  UpdateTrustLambdaFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      Handler: index.lambda_handler
-      Runtime: python3.8
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        ZipFile: |
-          import json
-          import boto3
-
-          def lambda_handler(event, context):
-              iam = boto3.client('iam')
-              role_a_arn = event['ResourceProperties']['RoleAArn']
-              role_b_arn = event['ResourceProperties']['RoleBArn']
-              role_a_name = event['ResourceProperties']['RoleAName']
-              role_b_name = event['ResourceProperties']['RoleBName']
-
-              # Update Role A to trust Role B
-              iam.update_assume_role_policy(
-                  RoleName=role_a_name,
-                  PolicyDocument=json.dumps({
-                      "Version": "2012-10-17",
-                      "Statement": [
-                          {
-                              "Effect": "Allow",
-                              "Principal": {
-                                  "Service": "ecs-tasks.amazonaws.com"
-                              },
-                              "Action": "sts:AssumeRole"
-                          },
-                          {
-                              "Effect": "Allow",
-                              "Principal": {
-                                  "AWS": role_b_arn
-                              },
-                              "Action": "sts:AssumeRole"
-                          }
-                      ]
-                  })
-              )
-
-              # Update Role B to trust Role A
-              iam.update_assume_role_policy(
-                  RoleName=role_b_name,
-                  PolicyDocument=json.dumps({
-                      "Version": "2012-10-17",
-                      "Statement": [
-                          {
-                              "Effect": "Allow",
-                              "Principal": {
-                                  "Service": "ecs-tasks.amazonaws.com"
-                              },
-                              "Action": "sts:AssumeRole"
-                          },
-                          {
-                              "Effect": "Allow",
-                              "Principal": {
-                                  "AWS": role_a_arn
-                              },
-                              "Action": "sts:AssumeRole"
-                          }
-                      ]
-                  })
-
-              return {
-                  'statusCode': 200,
-                  'body': json.dumps('Trust policies updated successfully.')
-              }
-
-  # Custom Resource to trigger Lambda after Role creation
-  UpdateTrustPolicy:
-    Type: Custom::UpdateTrustPolicy
-    DependsOn:
-      - TaskExecutionRole
-      - TaskRole
-    Properties:
-      ServiceToken: !GetAtt UpdateTrustLambdaFunction.Arn
-      RoleAArn: !GetAtt TaskExecutionRole.Arn
-      RoleBArn: !GetAtt TaskRole.Arn
-      RoleAName: !Ref TaskExecutionRole
-      RoleBName: !Ref TaskRole
- 
-  # S3 Bucket for storing audio and SSML files
-  S3Bucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub "my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
-      VersioningConfiguration:
-        Status: Enabled
-      LifecycleConfiguration:
-        Rules:
-          - Status: Enabled
-            ExpirationInDays: 30
-
-  # ECS Task Definition
+  # ECS Task Definition using TTSRoleArn parameter for both ExecutionRoleArn and TaskRoleArn
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -316,8 +158,8 @@ Resources:
       Cpu: '256'
       Memory: '512'
       NetworkMode: awsvpc
-      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
-      TaskRoleArn: !GetAtt TaskRole.Arn
+      ExecutionRoleArn: !Ref TTSRoleArn
+      TaskRoleArn: !Ref TTSRoleArn
       ContainerDefinitions:
         - Name: fastapi-container
           Image: !Ref ImageUrl
@@ -334,7 +176,7 @@ Resources:
             - Name: S3_BUCKET_NAME
               Value: !Ref S3Bucket
             - Name: IAM_ROLE_ARN
-              Value: !GetAtt TaskExecutionRole.Arn
+              Value: !Ref TTSRoleArn
             - Name: ALB_DNS_NAME
               Value: !GetAtt ApplicationLoadBalancer.DNSName
 
@@ -374,9 +216,6 @@ Outputs:
   S3BucketName:
     Description: "Name of the S3 Bucket"
     Value: !Ref S3Bucket
-  TaskExecutionRoleArn:
-    Description: "ARN of the Task Execution Role"
-    Value: !GetAtt TaskExecutionRole.Arn
-  TaskRoleArn:
-    Description: "ARN of the Task Role"
-    Value: !GetAtt TaskRole.Arn
+  TTSRoleArn:
+    Description: "ARN of the tts-role used for Execution and Task roles"
+    Value: !Ref TTSRoleArn
