@@ -27,7 +27,7 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      AvailabilityZone: !Select [0, !GetAZs '']
       Tags:
         - Key: Name
           Value: PublicSubnet1
@@ -38,7 +38,7 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      AvailabilityZone: !Select [1, !GetAZs '']
       Tags:
         - Key: Name
           Value: PublicSubnet2
@@ -126,48 +126,48 @@ Resources:
       TargetType: ip 
       HealthCheckProtocol : HTTP 
       HealthCheckPath : / 
-      HealthCheckIntervalSeconds :30 
-      HealthCheckTimeoutSeconds :5 
-      
+      HealthCheckIntervalSeconds : 30 
+      HealthCheckTimeoutSeconds : 5 
+
   # ALB Listener 
   ALBListener : 
-     Type : AWS :: ElasticLoadBalancingV2 :: Listener 
+     Type : AWS::ElasticLoadBalancingV2::Listener 
      Properties : 
        DefaultActions : 
          - Type : forward 
            TargetGroupArn : !Ref TargetGroup 
        LoadBalancerArn : !Ref ApplicationLoadBalancer 
-       Port :80 
-       Protocol :HTTP 
+       Port : 80 
+       Protocol : HTTP 
 
    # ECS Cluster  
    ECSCluster :  
-     Type : AWS :: ECS :: Cluster  
+     Type : AWS::ECS::Cluster  
      Properties :  
        ClusterName : MyFargateCluster  
 
    # S3 Bucket for storing audio and SSML files  
    S3Bucket :  
-     Type : AWS :: S3 :: Bucket  
+     Type : AWS::S3::Bucket  
      Properties :  
-       BucketName : !Sub "my-fastapi-app-bucket-${AWS :: Region}-${AWS :: AccountId}"  
+       BucketName : !Sub "my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"  
        VersioningConfiguration :  
          Status : Enabled  
        LifecycleConfiguration :  
          Rules :  
            - Status : Enabled  
-             ExpirationInDays :30  
+             ExpirationInDays : 30  
 
    # CloudWatch Log Group for ECS Task logs  
    LogGroup :  
-     Type : AWS :: Logs :: LogGroup  
+     Type : AWS::Logs::LogGroup  
      Properties :  
        LogGroupName : /ecs/fastapi-app  
-       RetentionInDays :7  
+       RetentionInDays : 7  
 
    # DynamoDB Table for request metadata storage   
    RequestMetadataTable :
-     Type : AWS :: DynamoDB :: Table    
+     Type : AWS::DynamoDB::Table    
      Properties :
        TableName :"RequestMetadata"
        AttributeDefinitions :
@@ -182,16 +182,16 @@ Resources:
 
    # SQS Queue for asynchronous processing   
    SQSQueue :
-     Type : AWS :: SQS :: Queue    
+     Type : AWS::SQS::Queue    
      Properties :
        QueueName :"TextToSpeechQueue"    
 
    # Lambda Function to process SQS messages   
    TextToSpeechLambdaFunction :
-     Type : AWS :: Lambda :: Function    
+     Type : AWS::Lambda::Function    
      Properties :
        Handler :"lambda_function.lambda_handler"    
-       Role :! GetAtt LambdaExecutionRole.Arn    
+       Role :!GetAtt LambdaExecutionRole.Arn    
        Code :
          ZipFile :"import json\nimport boto3\n\ndef lambda_handler(event, context):\n\t# Your processing logic here\n\treturn {'statusCode':200,'body':'Processed'}"    
        Runtime :"python3.8"    
@@ -200,7 +200,7 @@ Resources:
 
    # IAM Role for Lambda Execution   
    LambdaExecutionRole :
-     Type : AWS :: IAM :: Role    
+     Type : AWS::IAM::Role    
      Properties :
        AssumeRolePolicyDocument :
          Version :"2012-10-17"    
@@ -227,23 +227,23 @@ Resources:
      Type : AWS :: Lambda :: EventSourceMapping   
      Properties :
        BatchSize :10   
-       EventSourceArn :! GetAtt SQSQueue.Arn   
-       FunctionName :! GetAtt TextToSpeechLambdaFunction.Arn   
+       EventSourceArn :!GetAtt SQSQueue.Arn   
+       FunctionName :!GetAtt TextToSpeechLambdaFunction.Arn   
        Enabled :true   
 
 Outputs :
    ALBDNSName :
      Description :"DNS Name of the Application Load Balancer"    
-     Value :! GetAtt ApplicationLoadBalancer.DNSName    
+     Value :!GetAtt ApplicationLoadBalancer.DNSName    
 
    S3BucketName :
      Description :"Name of the S3 Bucket"    
-     Value :! Ref S3Bucket    
+     Value :!Ref S3Bucket    
 
    TTSRoleArn :
      Description :"ARN of the tts-role used for Execution and Task roles"    
-     Value :! Ref TTSRoleArn    
+     Value :!Ref TTSRoleArn    
 
    RequestMetadataTableName :
      Description :"DynamoDB Table Name for Request Metadata"
-     Value :! Ref RequestMetadataTable 
+     Value :!Ref RequestMetadataTable 
