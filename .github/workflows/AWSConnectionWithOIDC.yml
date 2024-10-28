@@ -40,6 +40,11 @@ jobs:
             ECR_REPO_URI=$(aws ecr describe-repositories --repository-names $REPO_NAME --query 'repositories[0].repositoryUri' --output text)
           fi
 
+          if [ "$ECR_REPO_URI" == "NOT_FOUND" ]; then
+            echo "Error: Failed to retrieve or create ECR repository URI"
+            exit 1
+          fi
+
           echo "ECR_REPO_URI=$ECR_REPO_URI" >> $GITHUB_ENV
 
       # Step 4: Build Docker image
@@ -61,7 +66,18 @@ jobs:
       - name: Retrieve TTS Role ARN and Deploy CloudFormation Stack
         run: |
           # Retrieve TTS Role ARN
-          TTS_ROLE_ARN=$(aws iam get-role --role-name "tts-role" --query "Role.Arn" --output text)
+          TTS_ROLE_ARN=$(aws iam get-role --role-name "tts-role" --query "Role.Arn" --output text 2>/dev/null)
+          if [ -z "$TTS_ROLE_ARN" ]; then
+            echo "Error: Unable to retrieve TTS Role ARN."
+            exit 1
+          fi
+          echo "TTS_ROLE_ARN=$TTS_ROLE_ARN"
+
+          # Check if ECR_REPO_URI is set correctly
+          if [ -z "$ECR_REPO_URI" ]; then
+            echo "Error: ECR_REPO_URI is not set. Make sure the ECR repository creation step was successful."
+            exit 1
+          fi
 
           # Deploy CloudFormation stack with necessary parameters
           aws cloudformation deploy \
