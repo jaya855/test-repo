@@ -97,137 +97,153 @@ Resources:
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Enable HTTP access to ECS tasks
+      GroupDescription: Enable HTTP access to ECS tasks and Lambda functions.
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 8000
-          ToPort: 8000
+          FromPort: 8000 
+          ToPort: 8000 
           CidrIp: 0.0.0.0/0
 
-  # Load Balancer
+  # Load Balancer (ALB)
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Scheme: internet-facing
+      Scheme: internet-facing 
       SecurityGroups:
-        - !Ref ALBSecurityGroup
+        - !Ref ALBSecurityGroup 
       Subnets:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+        - !Ref PublicSubnet1 
+        - !Ref PublicSubnet2 
 
-  # Target Group
+  # Target Group for ECS Service 
   TargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup 
     Properties:
-      VpcId: !Ref VPC
-      Port: 80
-      Protocol: HTTP
-      TargetType: ip
-      HealthCheckProtocol: HTTP
-      HealthCheckPath: /
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 5
-      UnhealthyThresholdCount: 2
-      Matcher:
-        HttpCode: '200'
+      VpcId: !Ref VPC 
+      Port: 8000 
+      Protocol: HTTP 
+      TargetType: ip 
+      HealthCheckProtocol : HTTP 
+      HealthCheckPath : / 
+      HealthCheckIntervalSeconds :30 
+      HealthCheckTimeoutSeconds :5 
+      
+  # ALB Listener 
+  ALBListener : 
+     Type : AWS :: ElasticLoadBalancingV2 :: Listener 
+     Properties : 
+       DefaultActions : 
+         - Type : forward 
+           TargetGroupArn : !Ref TargetGroup 
+       LoadBalancerArn : !Ref ApplicationLoadBalancer 
+       Port :80 
+       Protocol :HTTP 
 
-  # ALB Listener
-  ALBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref TargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
+   # ECS Cluster  
+   ECSCluster :  
+     Type : AWS :: ECS :: Cluster  
+     Properties :  
+       ClusterName : MyFargateCluster  
 
-  # ECS Cluster
-  ECSCluster:
-    Type: AWS::ECS::Cluster
-    Properties:
-      ClusterName: MyFargateCluster
+   # S3 Bucket for storing audio and SSML files  
+   S3Bucket :  
+     Type : AWS :: S3 :: Bucket  
+     Properties :  
+       BucketName : !Sub "my-fastapi-app-bucket-${AWS :: Region}-${AWS :: AccountId}"  
+       VersioningConfiguration :  
+         Status : Enabled  
+       LifecycleConfiguration :  
+         Rules :  
+           - Status : Enabled  
+             ExpirationInDays :30  
 
-  # S3 Bucket for storing audio and SSML files
-  S3Bucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub "my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
-      VersioningConfiguration:
-        Status: Enabled
-      LifecycleConfiguration:
-        Rules:
-          - Status: Enabled
-            ExpirationInDays: 30
+   # CloudWatch Log Group for ECS Task logs  
+   LogGroup :  
+     Type : AWS :: Logs :: LogGroup  
+     Properties :  
+       LogGroupName : /ecs/fastapi-app  
+       RetentionInDays :7  
 
-  # CloudWatch Log Group for ECS Task logs
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /ecs/fastapi-app
-      RetentionInDays: 7
+   # DynamoDB Table for request metadata storage   
+   RequestMetadataTable :
+     Type : AWS :: DynamoDB :: Table    
+     Properties :
+       TableName :"RequestMetadata"
+       AttributeDefinitions :
+         - AttributeName :"request_id"    
+           AttributeType :"S"    
+       KeySchema :
+         - AttributeName :"request_id"    
+           KeyType :"HASH"    
+       ProvisionedThroughput :
+         ReadCapacityUnits :5    
+         WriteCapacityUnits :5    
 
-  # ECS Task Definition using TTSRoleArn parameter for both ExecutionRoleArn and TaskRoleArn
-  ECSTaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      RequiresCompatibilities:
-        - FARGATE
-      Cpu: '256'
-      Memory: '512'
-      NetworkMode: awsvpc
-      ExecutionRoleArn: !Ref TTSRoleArn
-      TaskRoleArn: !Ref TTSRoleArn
-      ContainerDefinitions:
-        - Name: fastapi-container
-          Image: !Ref ImageUrl
-          PortMappings:
-            - ContainerPort: 8000
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: /ecs/fastapi-app
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
-          Environment:
-            - Name: S3_BUCKET_NAME
-              Value: !Ref S3Bucket
-            - Name: ALB_DNS_NAME
-              Value: !GetAtt ApplicationLoadBalancer.DNSName
-            - Name: IAM_ROLE_ARN  # Environment variable to store IAM role ARN for the application
-              Value: !Ref TTSRoleArn
+   # SQS Queue for asynchronous processing   
+   SQSQueue :
+     Type : AWS :: SQS :: Queue    
+     Properties :
+       QueueName :"TextToSpeechQueue"    
 
-  # ECS Service
-  ECSService:
-    Type: AWS::ECS::Service
-    DependsOn: ALBListener
-    Properties:
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref ECSTaskDefinition
-      DesiredCount: 1
-      LaunchType: FARGATE
-      LoadBalancers:
-        - ContainerName: fastapi-container
-          ContainerPort: 8000
-          TargetGroupArn: !Ref TargetGroup
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-          Subnets:
-            - !Ref PublicSubnet1
-            - !Ref PublicSubnet2
+   # Lambda Function to process SQS messages   
+   TextToSpeechLambdaFunction :
+     Type : AWS :: Lambda :: Function    
+     Properties :
+       Handler :"lambda_function.lambda_handler"    
+       Role :! GetAtt LambdaExecutionRole.Arn    
+       Code :
+         ZipFile :"import json\nimport boto3\n\ndef lambda_handler(event, context):\n\t# Your processing logic here\n\treturn {'statusCode':200,'body':'Processed'}"    
+       Runtime :"python3.8"    
+       MemorySize :128    
+       Timeout :30    
 
-Outputs:
-  ALBDNSName:
-    Description: "DNS Name of the Application Load Balancer"
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
-  S3BucketName:
-    Description: "Name of the S3 Bucket"
-    Value: !Ref S3Bucket
-  TTSRoleArn:
-    Description: "ARN of the tts-role used for Execution and Task roles"
-    Value: !Ref TTSRoleArn
+   # IAM Role for Lambda Execution   
+   LambdaExecutionRole :
+     Type : AWS :: IAM :: Role    
+     Properties :
+       AssumeRolePolicyDocument :
+         Version :"2012-10-17"    
+         Statement :
+           - Effect :"Allow"    
+             Principal :
+               Service :"lambda.amazonaws.com"    
+             Action :"sts AssumeRole"    
+       Policies :
+         - PolicyName :"LambdaSQSS3Policy"    
+           PolicyDocument :
+             Version :"2012-10-17"    
+             Statement :
+               - Effect :"Allow"    
+                 Action :
+                   - "sqs:*"
+                   - "dynamodb:*"
+                   - "s3:*"
+                 Resource :
+                   - "*"    
+
+   # Event Source Mapping to trigger Lambda from SQS   
+   SQSTriggerMapping :
+     Type : AWS :: Lambda :: EventSourceMapping   
+     Properties :
+       BatchSize :10   
+       EventSourceArn :! GetAtt SQSQueue.Arn   
+       FunctionName :! GetAtt TextToSpeechLambdaFunction.Arn   
+       Enabled :true   
+
+Outputs :
+   ALBDNSName :
+     Description :"DNS Name of the Application Load Balancer"    
+     Value :! GetAtt ApplicationLoadBalancer.DNSName    
+
+   S3BucketName :
+     Description :"Name of the S3 Bucket"    
+     Value :! Ref S3Bucket    
+
+   TTSRoleArn :
+     Description :"ARN of the tts-role used for Execution and Task roles"    
+     Value :! Ref TTSRoleArn    
+
+   RequestMetadataTableName :
+     Description :"DynamoDB Table Name for Request Metadata"
+     Value :! Ref RequestMetadataTable 
