@@ -63,8 +63,10 @@ jobs:
           # Retrieve TTS Role ARN
           TTS_ROLE_ARN=$(aws iam get-role --role-name "tts-role" --query "Role.Arn" --output text)
 
+          # Deploy CloudFormation stack with additional parameters for SQS and DynamoDB
           aws cloudformation deploy \
             --template-file cloudformation/deploy.yml \
             --stack-name fastapi-app-stack \
             --parameter-overrides ImageUrl=$ECR_REPO_URI:latest TTSRoleArn=$TTS_ROLE_ARN \
-            --capabilities CAPABILITY_NAMED_IAM
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides SQSQueueName="TextToSpeechQueue" RequestMetadataTableName="RequestMetadata"
