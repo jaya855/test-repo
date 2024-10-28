@@ -1,19 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: >
-  CloudFormation template to deploy a FastAPI application on ECS Fargate 
-  with supporting infrastructure: S3, SQS, DynamoDB, and ALB.
-
 Parameters:
   ImageUrl:
     Type: String
-    Description: "Docker image URL for the FastAPI app in ECR."
-
+    Description: "Docker image URL for the FastAPI app"
   TTSRoleArn:
     Type: String
-    Description: "ARN of the tts-role for ECS Task and Execution Role."
+    Default: "arn:aws:iam::121263836368:role/tts-role"  # Default to your specific tts-role ARN
+    Description: "ARN of the tts-role to use for ECS Task and Execution Role"
 
 Resources:
-  # VPC Configuration
+  # VPC
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -31,7 +27,7 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [0, !GetAZs '']
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
       Tags:
         - Key: Name
           Value: PublicSubnet1
@@ -42,12 +38,12 @@ Resources:
       VpcId: !Ref VPC
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [1, !GetAZs '']
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
       Tags:
         - Key: Name
           Value: PublicSubnet2
 
-  # Internet Gateway and Attachments
+  # Internet Gateway and Routing
   InternetGateway:
     Type: AWS::EC2::InternetGateway
 
@@ -57,7 +53,7 @@ Resources:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
 
-  # Public Route Table and Routes
+  # Route Table and Routes
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -101,7 +97,7 @@ Resources:
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Enable HTTP access to ECS tasks and Lambda functions.
+      GroupDescription: Enable HTTP access to ECS tasks
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -109,7 +105,7 @@ Resources:
           ToPort: 8000
           CidrIp: 0.0.0.0/0
 
-  # Application Load Balancer (ALB)
+  # Load Balancer
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -120,18 +116,22 @@ Resources:
         - !Ref PublicSubnet1
         - !Ref PublicSubnet2
 
-  # Target Group for ECS Service
+  # Target Group
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       VpcId: !Ref VPC
-      Port: 8000
+      Port: 80
       Protocol: HTTP
       TargetType: ip
       HealthCheckProtocol: HTTP
       HealthCheckPath: /
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      UnhealthyThresholdCount: 2
+      Matcher:
+        HttpCode: '200'
 
   # ALB Listener
   ALBListener:
@@ -144,13 +144,13 @@ Resources:
       Port: 80
       Protocol: HTTP
 
-  # ECS Cluster for Fargate
+  # ECS Cluster
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: MyFargateCluster
 
-  # S3 Bucket for Storage
+  # S3 Bucket for storing audio and SSML files
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -162,97 +162,72 @@ Resources:
           - Status: Enabled
             ExpirationInDays: 30
 
-  # CloudWatch Log Group for ECS
+  # CloudWatch Log Group for ECS Task logs
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: /ecs/fastapi-app
       RetentionInDays: 7
 
-  # DynamoDB Table for Metadata Storage
-  RequestMetadataTable:
-    Type: AWS::DynamoDB::Table
+  # ECS Task Definition using TTSRoleArn parameter for both ExecutionRoleArn and TaskRoleArn
+  ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
     Properties:
-      TableName: "RequestMetadata"
-      AttributeDefinitions:
-        - AttributeName: "request_id"
-          AttributeType: "S"
-      KeySchema:
-        - AttributeName: "request_id"
-          KeyType: "HASH"
-      ProvisionedThroughput:
-        ReadCapacityUnits: 5
-        WriteCapacityUnits: 5
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref TTSRoleArn
+      TaskRoleArn: !Ref TTSRoleArn
+      ContainerDefinitions:
+        - Name: fastapi-container
+          Image: !Ref ImageUrl
+          PortMappings:
+            - ContainerPort: 8000
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: /ecs/fastapi-app
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          Environment:
+            - Name: S3_BUCKET_NAME
+              Value: !Ref S3Bucket
+            - Name: ALB_DNS_NAME
+              Value: !GetAtt ApplicationLoadBalancer.DNSName
+            - Name: IAM_ROLE_ARN  # Environment variable to store IAM role ARN for the application
+              Value: !Ref TTSRoleArn
 
-  # SQS Queue for Asynchronous Processing
-  SQSQueue:
-    Type: AWS::SQS::Queue
+  # ECS Service
+  ECSService:
+    Type: AWS::ECS::Service
+    DependsOn: ALBListener
     Properties:
-      QueueName: "TextToSpeechQueue"
-
-  # Lambda Function to Process SQS Messages
-  TextToSpeechLambdaFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      Handler: "lambda_function.lambda_handler"
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        ZipFile: |
-          import json
-          import boto3
-
-          def lambda_handler(event, context):
-              # Your processing logic here
-              return {'statusCode': 200, 'body': 'Processed'}
-      Runtime: "python3.8"
-      MemorySize: 128
-      Timeout: 30
-
-  # IAM Role for Lambda Execution
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: "Allow"
-            Principal:
-              Service: "lambda.amazonaws.com"
-            Action: "sts:AssumeRole"
-      Policies:
-        - PolicyName: "LambdaSQSS3Policy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: "Allow"
-                Action:
-                  - "sqs:*"
-                  - "dynamodb:*"
-                  - "s3:*"
-                Resource: "*"
-
-  # Event Source Mapping for Lambda with SQS
-  SQSTriggerMapping:
-    Type: AWS::Lambda::EventSourceMapping
-    Properties:
-      BatchSize: 10
-      EventSourceArn: !GetAtt SQSQueue.Arn
-      FunctionName: !GetAtt TextToSpeechLambdaFunction.Arn
-      Enabled: true
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref ECSTaskDefinition
+      DesiredCount: 1
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: fastapi-container
+          ContainerPort: 8000
+          TargetGroupArn: !Ref TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
 
 Outputs:
   ALBDNSName:
     Description: "DNS Name of the Application Load Balancer"
     Value: !GetAtt ApplicationLoadBalancer.DNSName
-
   S3BucketName:
     Description: "Name of the S3 Bucket"
     Value: !Ref S3Bucket
-
   TTSRoleArn:
     Description: "ARN of the tts-role used for Execution and Task roles"
     Value: !Ref TTSRoleArn
-
-  RequestMetadataTableName:
-    Description: "DynamoDB Table Name for Request Metadata"
-    Value: !Ref RequestMetadataTable
