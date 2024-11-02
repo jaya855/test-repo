@@ -61,7 +61,7 @@ jobs:
       - name: Retrieve TTS Role ARN and Deploy CloudFormation Stack
         run: |
           # Retrieve TTS Role ARN
-          TTS_ROLE_ARN=$(aws iam get-role --role-name "tts-role-1" --query "Role.Arn" --output text)
+          TTS_ROLE_ARN=$(aws iam get-role --role-name "tts-role" --query "Role.Arn" --output text)
 
           aws cloudformation deploy \
             --template-file cloudformation/deploy.yml \
