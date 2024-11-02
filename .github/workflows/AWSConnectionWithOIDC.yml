@@ -57,30 +57,20 @@ jobs:
         run: |
           docker push $ECR_REPO_URI:latest
 
-      # Step 6: Check/Create TTS Role and Deploy CloudFormation Stack
-      - name: Check/Create TTS Role and Retrieve ARN
-        run: |
-          ROLE_NAME="tts-role"
-          TTS_ROLE_ARN=$(aws iam get-role --role-name $ROLE_NAME --query "Role.Arn" --output text 2>/dev/null || echo "NOT_FOUND")
-
-          # If the role doesn't exist, create it
-          if [ "$TTS_ROLE_ARN" == "NOT_FOUND" ]; then
-            echo "Creating tts-role..."
-            aws cloudformation deploy \
-              --template-file cloudformation/deploy.yml \
-              --stack-name tts-role-stack \
-              --capabilities CAPABILITY_NAMED_IAM
-              
-            # Retrieve ARN of the newly created role
-            TTS_ROLE_ARN=$(aws iam get-role --role-name $ROLE_NAME --query "Role.Arn" --output text)
-          fi
-
-          echo "TTS_ROLE_ARN=$TTS_ROLE_ARN" >> $GITHUB_ENV
-
-      - name: Deploy CloudFormation Stack with Application
+      # Step 6: Deploy CloudFormation Stack with Application and Role
+      - name: Deploy CloudFormation Stack with Application and Role
         run: |
           aws cloudformation deploy \
             --template-file cloudformation/deploy.yml \
             --stack-name fastapi-app-stack \
-            --parameter-overrides ImageUrl=$ECR_REPO_URI:latest TTSRoleArn=$TTS_ROLE_ARN \
+            --parameter-overrides ImageUrl=$ECR_REPO_URI:latest \
             --capabilities CAPABILITY_NAMED_IAM
+
+      # Step 7: Retrieve TTS Role ARN After Creation
+      - name: Retrieve TTS Role ARN
+        run: |
+          ROLE_NAME="tts-role"
+          TTS_ROLE_ARN=$(aws iam get-role --role-name $ROLE_NAME --query "Role.Arn" --output text)
+
+          # Export the ARN to be used by subsequent steps if necessary
+          echo "TTS_ROLE_ARN=$TTS_ROLE_ARN" >> $GITHUB_ENV
