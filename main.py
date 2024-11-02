@@ -131,6 +131,7 @@ def get_azure_secrets(secret_name="azure-secrets", region_name="ap-south-1"):
         logging.error(f"Failed to retrieve secret: {e}")
         raise e
 
+
 # Function to retrieve supported voices from Azure Speech API
 def get_supported_voices():
     azure_secrets = get_azure_secrets()
