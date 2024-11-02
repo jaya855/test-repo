@@ -15,9 +15,11 @@ Resources:
         Statement:
           - Effect: "Allow"
             Principal:
-              Service:
-                - "ecs-tasks.amazonaws.com"
-                - "s3.amazonaws.com"
+              Service: "ecs-tasks.amazonaws.com"
+            Action: "sts:AssumeRole"
+          - Effect: "Allow"
+            Principal:
+              Service: "s3.amazonaws.com"
             Action: "sts:AssumeRole"
           - Effect: "Allow"
             Principal:
@@ -68,7 +70,6 @@ Resources:
                   - "secretsmanager:DescribeSecret"
                   - "secretsmanager:ListSecrets"
                 Resource: "*"
-
   # VPC
   VPC:
     Type: AWS::EC2::VPC
