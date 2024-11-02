@@ -3,12 +3,70 @@ Parameters:
   ImageUrl:
     Type: String
     Description: "Docker image URL for the FastAPI app"
-  TTSRoleArn:
-    Type: String
-    Default: "arn:aws:iam::121263836368:role/tts-role"  # Default to your specific tts-role ARN
-    Description: "ARN of the tts-role to use for ECS Task and Execution Role"
 
 Resources:
+  # IAM Role for ECS Tasks with Permissions Attached
+  TTSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "tts-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+            Action: "sts:AssumeRole"
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:role/tts-role"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "ECRFullAccessPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecr:*"
+                  - "ecr-public:*"
+                Resource: "*"
+        - PolicyName: "LogPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "logs:*"
+                Resource: "arn:aws:logs:*:*:*"
+              - Effect: "Allow"
+                Action:
+                  - "ecs:CreateCluster"
+                  - "ecs:CreateService"
+                  - "ecs:RegisterTaskDefinition"
+                  - "elasticloadbalancing:CreateLoadBalancer"
+                  - "elasticloadbalancing:DescribeTargetGroups"
+                Resource: "*"
+        - PolicyName: "S3Policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                Resource: "arn:aws:s3:::my-fastapi-app-bucket-ap-south-1-121263836368/*"
+        - PolicyName: "SecretsManagerReadWrite"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "secretsmanager:GetSecretValue"
+                  - "secretsmanager:DescribeSecret"
+                  - "secretsmanager:ListSecrets"
+                Resource: "*"
+
   # VPC
   VPC:
     Type: AWS::EC2::VPC
@@ -169,7 +227,7 @@ Resources:
       LogGroupName: /ecs/fastapi-app
       RetentionInDays: 7
 
-  # ECS Task Definition using TTSRoleArn parameter for both ExecutionRoleArn and TaskRoleArn
+  # ECS Task Definition using the created TTSRole for both ExecutionRoleArn and TaskRoleArn
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -178,8 +236,8 @@ Resources:
       Cpu: '256'
       Memory: '512'
       NetworkMode: awsvpc
-      ExecutionRoleArn: !Ref TTSRoleArn
-      TaskRoleArn: !Ref TTSRoleArn
+      ExecutionRoleArn: !GetAtt TTSRole.Arn
+      TaskRoleArn: !GetAtt TTSRole.Arn
       ContainerDefinitions:
         - Name: fastapi-container
           Image: !Ref ImageUrl
@@ -197,7 +255,7 @@ Resources:
             - Name: ALB_DNS_NAME
               Value: !GetAtt ApplicationLoadBalancer.DNSName
             - Name: IAM_ROLE_ARN  # Environment variable to store IAM role ARN for the application
-              Value: !Ref TTSRoleArn
+              Value: !GetAtt TTSRole.Arn
 
   # ECS Service
   ECSService:
@@ -230,4 +288,4 @@ Outputs:
     Value: !Ref S3Bucket
   TTSRoleArn:
     Description: "ARN of the tts-role used for Execution and Task roles"
-    Value: !Ref TTSRoleArn
+    Value: !GetAtt TTSRole.Arn
