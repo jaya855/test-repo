@@ -70,7 +70,11 @@ def convert_timestamp_to_seconds(timestamp):
         return 0  # Default to 0 if timestamp is not in correct format
 
 # Function to assume the role and get temporary credentials
-def assume_role(role_arn=IAM_ROLE_ARN, session_name="MySession"):  # Use IAM role dynamically
+def assume_role(role_arn=IAM_ROLE_ARN, session_name="MySession"):
+    if environ.get("RUNNING_ON_ECS"):  # Check if running on ECS
+        # If running on ECS, use the default session as the role is already assigned
+        return boto3.Session()
+    
     try:
         sts_client = boto3.client('sts')
 
