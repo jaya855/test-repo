@@ -67,7 +67,7 @@ jobs:
           if [ "$TTS_ROLE_ARN" == "NOT_FOUND" ]; then
             echo "Creating tts-role..."
             aws cloudformation deploy \
-              --template-file cloudformation/tts-role.yml \
+              --template-file cloudformation/deploy.yml \
               --stack-name tts-role-stack \
               --capabilities CAPABILITY_NAMED_IAM
               
