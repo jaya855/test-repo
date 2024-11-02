@@ -16,8 +16,7 @@ Resources:
           - Effect: "Allow"
             Principal:
               AWS: "arn:aws:iam::121263836368:root"
-          Action:
-            - "sts:AssumeRole"
+            Action: "sts:AssumeRole"
       Policies:
         - PolicyName: "ECRFullAccessPolicy"
           PolicyDocument:
