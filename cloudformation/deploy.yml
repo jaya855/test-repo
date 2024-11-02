@@ -19,6 +19,10 @@ Resources:
                 - "ecs-tasks.amazonaws.com"
                 - "s3.amazonaws.com"
             Action: "sts:AssumeRole"
+          - Effect: "Allow"
+            Principal:
+              AWS: "arn:aws:iam::121263836368:role/tts-role"
+            Action: "sts:AssumeRole"
       Policies:
         - PolicyName: "ECRFullAccessPolicy"
           PolicyDocument:
