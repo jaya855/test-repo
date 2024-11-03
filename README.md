@@ -20,8 +20,23 @@ This README provides instructions to set up and deploy the FastAPI application u
    - Before running the pipeline, **create an OIDC role** in your AWS account using the provided CloudFormation template `oidc-role-template.yml` in this repository.
    - Ensure that the created role has sufficient permissions for deploying resources.
    - **Adjustments to make in the OIDC Role Template**:
-     - Replace `121263836368` in all ARNs within the `oidc-role-template.yml` file with your own AWS account ID.
-     - Change the `ap-south-1` region in the ARNs if deploying in a different AWS region.
+     - Define your **GitHub organization and repository name** in the trust policy to enable OpenID Connect (OIDC) access.
+     - No need to specify AWS account ID or region, as these are dynamically fetched.
+     - Example trust relationship JSON in `oidc-role-template.yml`:
+       ```yaml
+       AssumeRolePolicyDocument:
+         Version: "2012-10-17"
+         Statement:
+           - Effect: "Allow"
+             Principal:
+               Federated: "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+             Action: "sts:AssumeRoleWithWebIdentity"
+             Condition:
+               StringEquals:
+                 "token.actions.githubusercontent.com:sub": "repo:<GitHub_Org>/<Repo_Name>:ref:refs/heads/main"
+       ```
+     - Replace `<GitHub_Org>` with your GitHub organization name and `<Repo_Name>` with the repository name.
+     - Make sure the above configuration grants access to GitHub Actions on the `main` branch.
 
 4. **Modify Deployment Parameters**:
    - Replace occurrences of `121263836368` in ARNs with your AWS account ID across all templates and files.
@@ -51,3 +66,7 @@ Replace `<your-alb-dns-link>` with the DNS of your Application Load Balancer.
 ## Notes
 
 - Run tests to ensure successful deployment in the target environment.
+
+---
+
+This README now includes the updated trust relationship configuration, allowing for dynamic fetching of account details while specifying only the GitHub organization and repository name.
