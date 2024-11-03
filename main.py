@@ -14,7 +14,6 @@ import requests
 import uuid
 from os import environ
 from fastapi import FastAPI
-import os
 
 app = FastAPI()
 
@@ -70,33 +69,34 @@ def convert_timestamp_to_seconds(timestamp):
         return 0  # Default to 0 if timestamp is not in correct format
 
 # Function to assume the role and get temporary credentials
-def assume_role(role_arn=IAM_ROLE_ARN, session_name="MySession"):
-    if environ.get("RUNNING_ON_ECS"):  # Check if running on ECS
-        # If running on ECS, use the default session as the role is already assigned
-        return boto3.Session()
-    
-    try:
-        sts_client = boto3.client('sts')
-
-        # Assume the role
-        assumed_role_object = sts_client.assume_role(
-            RoleArn=role_arn,
-            RoleSessionName=session_name
-        )
-
-        # Get temporary credentials
-        credentials = assumed_role_object['Credentials']
-
-        # Create a new session with temporary credentials
-        session = boto3.Session(
-            aws_access_key_id=credentials['AccessKeyId'],
-            aws_secret_access_key=credentials['SecretAccessKey'],
-            aws_session_token=credentials['SessionToken']
-        )
-        return session
-    except ClientError as e:
-        logging.error(f"Failed to assume role: {e}")
-        raise e
+# Commented out the assume_role functionality as requested
+# def assume_role(role_arn=IAM_ROLE_ARN, session_name="MySession"):
+#     if environ.get("RUNNING_ON_ECS"):  # Check if running on ECS
+#         # If running on ECS, use the default session as the role is already assigned
+#         return boto3.Session()
+#     
+#     try:
+#         sts_client = boto3.client('sts')
+#
+#         # Assume the role
+#         assumed_role_object = sts_client.assume_role(
+#             RoleArn=role_arn,
+#             RoleSessionName=session_name
+#         )
+#
+#         # Get temporary credentials
+#         credentials = assumed_role_object['Credentials']
+#
+#         # Create a new session with temporary credentials
+#         session = boto3.Session(
+#             aws_access_key_id=credentials['AccessKeyId'],
+#             aws_secret_access_key=credentials['SecretAccessKey'],
+#             aws_session_token=credentials['SessionToken']
+#         )
+#         return session
+#     except ClientError as e:
+#         logging.error(f"Failed to assume role: {e}")
+#         raise e
 
 # Upload file to S3 (use dynamic S3 bucket name)
 def upload_file_to_s3(file_data, filename, folder):
@@ -112,11 +112,11 @@ def upload_file_to_s3(file_data, filename, folder):
         logging.error(f"Failed to upload file to S3: {e}")
         raise e
 
-# Fetch the Azure API key and region from AWS Secrets Manager using the assumed role
+# Fetch the Azure API key and region from AWS Secrets Manager (assume_role commented out)
 def get_azure_secrets(secret_name="azure-secrets", region_name="ap-south-1"):
     try:
-        # Assume the role and get temporary credentials
-        session = assume_role()
+        # session = assume_role()  # Commented out
+        session = boto3.Session()  # Use default session
 
         # Create a Secrets Manager client with the assumed role session
         client = session.client(service_name="secretsmanager", region_name=region_name)
@@ -134,7 +134,6 @@ def get_azure_secrets(secret_name="azure-secrets", region_name="ap-south-1"):
     except ClientError as e:
         logging.error(f"Failed to retrieve secret: {e}")
         raise e
-
 
 # Function to retrieve supported voices from Azure Speech API
 def get_supported_voices():
