@@ -1,6 +1,16 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: "CloudFormation template to create an IAM Role named oidc-role with specified permissions"
 
+Parameters:
+  AWSAccountID:
+    Type: String
+    Description: "AWS Account ID"
+    Default: !Ref "AWS::AccountId"
+  AWSRegion:
+    Type: String
+    Description: "AWS Region"
+    Default: !Ref "AWS::Region"
+
 Resources:
   OidcRole:
     Type: AWS::IAM::Role
@@ -31,8 +41,8 @@ Resources:
                   - "cloudformation:ExecuteChangeSet"
                   - "cloudformation:DeleteChangeSet"
                 Resource:
-                  - "arn:aws:cloudformation:ap-south-1:121263836368:stack/fastapi-app-stack/*"
-                  - "arn:aws:cloudformation:ap-south-1:121263836368:stack/tts-role-stack/*"
+                  - !Sub "arn:aws:cloudformation:${AWSRegion}:${AWSAccountID}:stack/fastapi-app-stack/*"
+                  - !Sub "arn:aws:cloudformation:${AWSRegion}:${AWSAccountID}:stack/tts-role-stack/*"
               - Effect: "Allow"
                 Action:
                   - "iam:PassRole"
@@ -42,7 +52,7 @@ Resources:
                   - "iam:AttachRolePolicy"
                   - "iam:DetachRolePolicy"
                   - "iam:PutRolePolicy"
-                Resource: "arn:aws:iam::121263836368:role/tts-role"
+                Resource: !Sub "arn:aws:iam::${AWSAccountID}:role/tts-role"
               - Effect: "Allow"
                 Action:
                   - "ecr:CreateRepository"
@@ -53,7 +63,7 @@ Resources:
                   - "ecr:ListTagsForResource"
                   - "ecr:TagResource"
                   - "ecr:UntagResource"
-                Resource: "arn:aws:ecr:ap-south-1:121263836368:repository/my-fastapi-app"
+                Resource: !Sub "arn:aws:ecr:${AWSRegion}:${AWSAccountID}:repository/my-fastapi-app"
               - Effect: "Allow"
                 Action:
                   - "ecr:GetAuthorizationToken"
@@ -116,7 +126,7 @@ Resources:
                   - "logs:DescribeLogGroups"
                   - "logs:DescribeLogStreams"
                   - "logs:PutRetentionPolicy"
-                Resource: "arn:aws:logs:ap-south-1:121263836368:log-group:/ecs/fastapi-app*"
+                Resource: !Sub "arn:aws:logs:${AWSRegion}:${AWSAccountID}:log-group:/ecs/fastapi-app*"
               - Effect: "Allow"
                 Action:
                   - "s3:CreateBucket"
@@ -130,8 +140,8 @@ Resources:
                   - "s3:PutObject"
                   - "s3:GetObject"
                 Resource:
-                  - "arn:aws:s3:::my-fastapi-app-bucket-ap-south-1-121263836368"
-                  - "arn:aws:s3:::my-fastapi-app-bucket-ap-south-1-121263836368/*"
+                  - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWSRegion}-${AWSAccountID}"
+                  - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWSRegion}-${AWSAccountID}/*"
               - Effect: "Allow"
                 Action:
                   - "secretsmanager:GetSecretValue"
