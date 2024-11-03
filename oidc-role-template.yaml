@@ -5,11 +5,9 @@ Parameters:
   AWSAccountID:
     Type: String
     Description: "AWS Account ID"
-    Default: !Ref "AWS::AccountId"
   AWSRegion:
     Type: String
     Description: "AWS Region"
-    Default: !Ref "AWS::Region"
 
 Resources:
   OidcRole:
