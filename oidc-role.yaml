@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "CloudFormation template to create an IAM Role named oidc-role with specified permissions"
+
+Resources:
+  OidcRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "oidc-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: 
+                - "ecs-tasks.amazonaws.com"
+                - "s3.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "OidcRolePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "cloudformation:CreateStack"
+                  - "cloudformation:UpdateStack"
+                  - "cloudformation:DescribeStacks"
+                  - "cloudformation:DeleteStack"
+                  - "cloudformation:CreateChangeSet"
+                  - "cloudformation:DescribeChangeSet"
+                  - "cloudformation:ExecuteChangeSet"
+                  - "cloudformation:DeleteChangeSet"
+                Resource:
+                  - "arn:aws:cloudformation:ap-south-1:121263836368:stack/fastapi-app-stack/*"
+                  - "arn:aws:cloudformation:ap-south-1:121263836368:stack/tts-role-stack/*"
+              - Effect: "Allow"
+                Action:
+                  - "iam:PassRole"
+                  - "iam:GetRole"
+                  - "iam:CreateRole"
+                  - "iam:DeleteRole"
+                  - "iam:AttachRolePolicy"
+                  - "iam:DetachRolePolicy"
+                  - "iam:PutRolePolicy"
+                Resource: "arn:aws:iam::121263836368:role/tts-role"
+              - Effect: "Allow"
+                Action:
+                  - "ecr:CreateRepository"
+                  - "ecr:DeleteRepository"
+                  - "ecr:DescribeRepositories"
+                  - "ecr:GetRepositoryPolicy"
+                  - "ecr:SetRepositoryPolicy"
+                  - "ecr:ListTagsForResource"
+                  - "ecr:TagResource"
+                  - "ecr:UntagResource"
+                Resource: "arn:aws:ecr:ap-south-1:121263836368:repository/my-fastapi-app"
+              - Effect: "Allow"
+                Action:
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:CompleteLayerUpload"
+                  - "ecr:InitiateLayerUpload"
+                  - "ecr:PutImage"
+                  - "ecr:UploadLayerPart"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "ec2:CreateVpc"
+                  - "ec2:CreateSubnet"
+                  - "ec2:CreateInternetGateway"
+                  - "ec2:AttachInternetGateway"
+                  - "ec2:CreateRoute"
+                  - "ec2:CreateRouteTable"
+                  - "ec2:AssociateRouteTable"
+                  - "ec2:CreateSecurityGroup"
+                  - "ec2:AuthorizeSecurityGroupIngress"
+                  - "ec2:DescribeVpcs"
+                  - "ec2:DescribeSubnets"
+                  - "ec2:DescribeSecurityGroups"
+                  - "ec2:DescribeRouteTables"
+                  - "ec2:DescribeInternetGateways"
+                  - "ec2:ModifyVpcAttribute"
+                  - "ec2:DescribeAvailabilityZones"
+                  - "ec2:CreateTags"
+                  - "ec2:ModifySubnetAttribute"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "elasticloadbalancing:CreateLoadBalancer"
+                  - "elasticloadbalancing:CreateTargetGroup"
+                  - "elasticloadbalancing:CreateListener"
+                  - "elasticloadbalancing:DescribeLoadBalancers"
+                  - "elasticloadbalancing:DescribeTargetGroups"
+                  - "elasticloadbalancing:DescribeListeners"
+                  - "elasticloadbalancing:ModifyListener"
+                  - "elasticloadbalancing:ModifyTargetGroup"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "ecs:DescribeClusters"
+                  - "ecs:CreateCluster"
+                  - "ecs:CreateService"
+                  - "ecs:RegisterTaskDefinition"
+                  - "ecs:DescribeServices"
+                  - "ecs:DescribeTaskDefinition"
+                  - "ecs:UpdateService"
+                  - "ecs:DeleteCluster"
+                  - "ecs:DeleteService"
+                  - "ecs:DeregisterTaskDefinition"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:DescribeLogGroups"
+                  - "logs:DescribeLogStreams"
+                  - "logs:PutRetentionPolicy"
+                Resource: "arn:aws:logs:ap-south-1:121263836368:log-group:/ecs/fastapi-app*"
+              - Effect: "Allow"
+                Action:
+                  - "s3:CreateBucket"
+                  - "s3:PutBucketPolicy"
+                  - "s3:PutBucketAcl"
+                  - "s3:PutBucketLogging"
+                  - "s3:PutLifecycleConfiguration"
+                  - "s3:GetBucketLocation"
+                  - "s3:ListBucket"
+                  - "s3:PutBucketVersioning"
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                Resource:
+                  - "arn:aws:s3:::my-fastapi-app-bucket-ap-south-1-121263836368"
+                  - "arn:aws:s3:::my-fastapi-app-bucket-ap-south-1-121263836368/*"
+              - Effect: "Allow"
+                Action:
+                  - "secretsmanager:GetSecretValue"
+                  - "secretsmanager:DescribeSecret"
+                  - "secretsmanager:ListSecrets"
+                Resource: "*"
+
+Outputs:
+  OidcRoleArn:
+    Description: "ARN of the oidc-role"
+    Value: !GetAtt OidcRole.Arn
