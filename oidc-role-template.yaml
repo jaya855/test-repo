@@ -1,13 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: "CloudFormation template to create an IAM Role named oidc-role with specified permissions"
+Description: "CloudFormation template to create an IAM Role named oidc-role with specified permissions for GitHub OIDC"
 
 Parameters:
-  AWSAccountID:
+  GitHubOrg:
     Type: String
-    Description: "AWS Account ID"
-  AWSRegion:
+    Default: "<YOUR_GITHUB_ORG>"
+    Description: "GitHub organization name for the OIDC trust relationship"
+  GitHubRepo:
     Type: String
-    Description: "AWS Region"
+    Default: "<YOUR_REPO>"
+    Description: "GitHub repository name for the OIDC trust relationship"
 
 Resources:
   OidcRole:
@@ -19,7 +21,14 @@ Resources:
         Statement:
           - Effect: "Allow"
             Principal:
-              Service: 
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: "sts:AssumeRoleWithWebIdentity"
+            Condition:
+              StringLike:
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:*"
+          - Effect: "Allow"
+            Principal:
+              Service:
                 - "ecs-tasks.amazonaws.com"
                 - "s3.amazonaws.com"
             Action: "sts:AssumeRole"
@@ -39,8 +48,8 @@ Resources:
                   - "cloudformation:ExecuteChangeSet"
                   - "cloudformation:DeleteChangeSet"
                 Resource:
-                  - !Sub "arn:aws:cloudformation:${AWSRegion}:${AWSAccountID}:stack/fastapi-app-stack/*"
-                  - !Sub "arn:aws:cloudformation:${AWSRegion}:${AWSAccountID}:stack/tts-role-stack/*"
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/fastapi-app-stack/*"
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/tts-role-stack/*"
               - Effect: "Allow"
                 Action:
                   - "iam:PassRole"
@@ -50,7 +59,7 @@ Resources:
                   - "iam:AttachRolePolicy"
                   - "iam:DetachRolePolicy"
                   - "iam:PutRolePolicy"
-                Resource: !Sub "arn:aws:iam::${AWSAccountID}:role/tts-role"
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/tts-role"
               - Effect: "Allow"
                 Action:
                   - "ecr:CreateRepository"
@@ -61,7 +70,7 @@ Resources:
                   - "ecr:ListTagsForResource"
                   - "ecr:TagResource"
                   - "ecr:UntagResource"
-                Resource: !Sub "arn:aws:ecr:${AWSRegion}:${AWSAccountID}:repository/my-fastapi-app"
+                Resource: !Sub "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/my-fastapi-app"
               - Effect: "Allow"
                 Action:
                   - "ecr:GetAuthorizationToken"
@@ -124,7 +133,7 @@ Resources:
                   - "logs:DescribeLogGroups"
                   - "logs:DescribeLogStreams"
                   - "logs:PutRetentionPolicy"
-                Resource: !Sub "arn:aws:logs:${AWSRegion}:${AWSAccountID}:log-group:/ecs/fastapi-app*"
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/fastapi-app*"
               - Effect: "Allow"
                 Action:
                   - "s3:CreateBucket"
@@ -138,8 +147,8 @@ Resources:
                   - "s3:PutObject"
                   - "s3:GetObject"
                 Resource:
-                  - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWSRegion}-${AWSAccountID}"
-                  - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWSRegion}-${AWSAccountID}/*"
+                  - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}"
+                  - !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}/*"
               - Effect: "Allow"
                 Action:
                   - "secretsmanager:GetSecretValue"
