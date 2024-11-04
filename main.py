@@ -13,18 +13,14 @@ import pandas as pd
 import requests
 import uuid
 from os import environ
-from fastapi import FastAPI
 
 app = FastAPI()
-
-@app.get("/api/alb-dns")
-async def get_alb_dns():
-    return {"dnsName": environ.get("ALB_DNS_NAME")}
 
 # Fetch environment variables for AWS resources
 S3_BUCKET_NAME = environ.get('S3_BUCKET_NAME')
 IAM_ROLE_ARN = environ.get('IAM_ROLE_ARN')
 ALB_DNS_NAME = environ.get('ALB_DNS_NAME')
+AWS_REGION = environ.get('AWS_REGION', 'us-east-1')  # Set default region if not provided
 
 # Print the fetched environment variables for debugging
 print(f"S3_BUCKET_NAME: {S3_BUCKET_NAME}")
@@ -34,7 +30,7 @@ print(f"ALB_DNS_NAME: {ALB_DNS_NAME}")
 # Set up CORS middleware to allow requests from specific origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[f"http://{ALB_DNS_NAME}/", "http://localhost:8000/"],  # Use ALB DNS dynamically
+    allow_origins=[f"http://{ALB_DNS_NAME}", "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods
     allow_headers=["*"],  # Allow all headers
@@ -68,41 +64,11 @@ def convert_timestamp_to_seconds(timestamp):
     except ValueError:
         return 0  # Default to 0 if timestamp is not in correct format
 
-# Function to assume the role and get temporary credentials
-# Commented out the assume_role functionality as requested
-# def assume_role(role_arn=IAM_ROLE_ARN, session_name="MySession"):
-#     if environ.get("RUNNING_ON_ECS"):  # Check if running on ECS
-#         # If running on ECS, use the default session as the role is already assigned
-#         return boto3.Session()
-#     
-#     try:
-#         sts_client = boto3.client('sts')
-#
-#         # Assume the role
-#         assumed_role_object = sts_client.assume_role(
-#             RoleArn=role_arn,
-#             RoleSessionName=session_name
-#         )
-#
-#         # Get temporary credentials
-#         credentials = assumed_role_object['Credentials']
-#
-#         # Create a new session with temporary credentials
-#         session = boto3.Session(
-#             aws_access_key_id=credentials['AccessKeyId'],
-#             aws_secret_access_key=credentials['SecretAccessKey'],
-#             aws_session_token=credentials['SessionToken']
-#         )
-#         return session
-#     except ClientError as e:
-#         logging.error(f"Failed to assume role: {e}")
-#         raise e
-
 # Upload file to S3 (use dynamic S3 bucket name)
 def upload_file_to_s3(file_data, filename, folder):
     try:
         s3_client = boto3.client('s3')
-        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=f"{folder}{filename}", Body=file_data)  # Use dynamic S3_BUCKET_NAME
+        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=f"{folder}{filename}", Body=file_data)
         logging.info(f"Uploaded {filename} to S3 in folder {folder}")
         return f"s3://{S3_BUCKET_NAME}/{folder}{filename}"
     except NoCredentialsError as e:
@@ -112,22 +78,14 @@ def upload_file_to_s3(file_data, filename, folder):
         logging.error(f"Failed to upload file to S3: {e}")
         raise e
 
-# Fetch the Azure API key and region from AWS Secrets Manager (assume_role commented out)
-def get_azure_secrets(secret_name="azure-secrets", region_name="ap-south-1"):
+# Fetch the Azure API key and region from AWS Secrets Manager
+def get_azure_secrets(secret_name="azure-secrets", region_name=AWS_REGION):
     try:
-        # session = assume_role()  # Commented out
-        session = boto3.Session()  # Use default session
-
-        # Create a Secrets Manager client with the assumed role session
+        session = boto3.Session()
         client = session.client(service_name="secretsmanager", region_name=region_name)
-
-        # Get the secret value from AWS Secrets Manager
         get_secret_value_response = client.get_secret_value(SecretId=secret_name)
         secret = get_secret_value_response["SecretString"]
-
-        # Parse and return the secret as a dictionary (API key and region)
         return eval(secret)
-
     except NoCredentialsError as e:
         logging.error("IAM role or credentials not set correctly")
         raise e
@@ -158,7 +116,6 @@ def generate_ssml(df, lang_column, male_voice, female_voice, xml_lang):
         raise ValueError(f"Column '{lang_column}' not found in the CSV file.")
 
     ssml_filename = f"{uuid.uuid4()}.ssml"
-
     ssml_content = f"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{xml_lang}'>\n"
     last_timestamp = 0
 
@@ -220,6 +177,36 @@ async def convert_ssml_to_audio(ssml_s3_path):
         logging.error(f"Error from Azure API: {response.text}")
         raise Exception(f"Error from Azure API: {response.text}")
 
+# Function to assume the role and get temporary credentials
+# Commented out the assume_role functionality as requested
+# def assume_role(role_arn=IAM_ROLE_ARN, session_name="MySession"):
+#     if environ.get("RUNNING_ON_ECS"):  # Check if running on ECS
+#         # If running on ECS, use the default session as the role is already assigned
+#         return boto3.Session()
+#     
+#     try:
+#         sts_client = boto3.client('sts')
+#
+#         # Assume the role
+#         assumed_role_object = sts_client.assume_role(
+#             RoleArn=role_arn,
+#             RoleSessionName=session_name
+#         )
+#
+#         # Get temporary credentials
+#         credentials = assumed_role_object['Credentials']
+#
+#         # Create a new session with temporary credentials
+#         session = boto3.Session(
+#             aws_access_key_id=credentials['AccessKeyId'],
+#             aws_secret_access_key=credentials['SecretAccessKey'],
+#             aws_session_token=credentials['SessionToken']
+#         )
+#         return session
+#     except ClientError as e:
+#         logging.error(f"Failed to assume role: {e}")
+#         raise e
+
 # Helper function to detect language
 def detect_language(text):
     try:
@@ -239,12 +226,9 @@ def find_transcription_column(df, locale_code):
 async def upload_csv(file: UploadFile = File(...), source: str = Form(...)):
     try:
         source_cleaned = source.strip().replace("\\", "").replace("\n", "").replace("\t", "")
-        print(source_cleaned)
-
         contents = await file.read()
         try:
             df = pd.read_csv(pd.io.common.StringIO(contents.decode("utf-8")), encoding="utf-8")
-            print(df.describe())
         except UnicodeDecodeError:
             logging.error("File encoding is not supported. Please ensure the file is UTF-8 encoded.")
             return {"error": "File encoding is not supported. Please ensure the file is UTF-8 encoded."}
