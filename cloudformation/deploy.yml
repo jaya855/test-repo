@@ -36,7 +36,7 @@ Resources:
               - Effect: "Allow"
                 Action:
                   - "logs:*"
-                Resource: "arn:aws:logs:*:*:*"
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
               - Effect: "Allow"
                 Action:
                   - "ecs:CreateCluster"
@@ -53,7 +53,7 @@ Resources:
                 Action:
                   - "s3:PutObject"
                   - "s3:GetObject"
-                Resource: "arn:aws:s3:::my-fastapi-app-bucket-ap-south-1-121263836368/*"
+                Resource: !Sub "arn:aws:s3:::my-fastapi-app-bucket-${AWS::Region}-${AWS::AccountId}/*"
         - PolicyName: "SecretsManagerReadWrite"
           PolicyDocument:
             Version: "2012-10-17"
