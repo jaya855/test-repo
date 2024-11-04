@@ -69,4 +69,4 @@ Replace `<your-alb-dns-link>` with the DNS of your Application Load Balancer.
 
 ---
 
-This README now includes the updated trust relationship configuration, allowing for dynamic fetching of account details while specifying only the GitHub organization and repository name.
+This README now includes the updated trust relationship configuration, allowing for dynamic fetching of account details while specifying only the GitHub organization and repository name
