@@ -181,11 +181,11 @@ Resources:
       Protocol: HTTP
       TargetType: ip
       HealthCheckProtocol: HTTP
-      HealthCheckPath: /
+      HealthCheckPath: "/"  # Ensure this matches an available endpoint
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 5
-      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 3  # Reduced to make health check less strict
+      UnhealthyThresholdCount: 5
       Matcher:
         HttpCode: '200'
 
@@ -255,7 +255,7 @@ Resources:
             - Name: IAM_ROLE_ARN  # Environment variable to store IAM role ARN for the application
               Value: !GetAtt TTSRole.Arn
 
-  # ECS Service
+  # ECS Service with Health Check Grace Period
   ECSService:
     Type: AWS::ECS::Service
     DependsOn: ALBListener
@@ -264,6 +264,7 @@ Resources:
       TaskDefinition: !Ref ECSTaskDefinition
       DesiredCount: 1
       LaunchType: FARGATE
+      HealthCheckGracePeriodSeconds: 60  # Allows time for application to initialize
       LoadBalancers:
         - ContainerName: fastapi-container
           ContainerPort: 8000
